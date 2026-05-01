@@ -447,7 +447,7 @@ tr:hover td{background:var(--bg3);}
   </div>
   <div class="card" style="margin-top:14px">
     <div class="card-title">Últimos cobros</div>
-    <div class="table-wrap"><table><thead><tr><th>Fecha</th><th>Producto</th><th>Importe</th><th></th></tr></thead><tbody id="b-cobros"></tbody></table></div>
+    <div class="table-wrap"><table><thead><tr><th>Fecha</th><th>Producto</th><th>Importe</th><th>Quitar</th></tr></thead><tbody id="b-cobros"></tbody></table></div>
   </div>
 </div>
 
@@ -1444,9 +1444,9 @@ function addGasto(){
 function delGasto(id){if(!confirm('¿Borrar?'))return;const g=D.gastos.find(x=>x.id===id);if(g&&g._sbid)deleteFromSupabase('gastos',g._sbid);D.gastos=D.gastos.filter(g=>g.id!==id);save();renderGastos();notify('Gasto eliminado');}
 function delCobro(id){
   if(!confirm('¿Borrar este cobro?'))return;
-  const c=D.cobros.find(x=>x.id===id);
+  const c=D.cobros.find(x=>String(x.id)===String(id)||String(x._sbid)===String(id));
   if(c&&c._sbid)deleteFromSupabase('cobros',c._sbid);
-  D.cobros=D.cobros.filter(x=>x.id!==id);
+  D.cobros=D.cobros.filter(x=>String(x.id)!==String(id)&&String(x._sbid)!==String(id));
   const item=c?D.catalogo.find(p=>p.id===c.itemId)||D.catalogo.find(p=>p.nombre===c.nombre):null;
   if(item&&item.estado==='Cobrado'&&confirm('¿Quieres devolver el pedido a Entregado?')){
     item.estado='Entregado';
@@ -1478,7 +1478,10 @@ function renderBalance(){
       <span><span class="badge ${catBadge(cat)}" style="margin-right:6px">${cat}</span></span>
       <span style="font-family:var(--mono);font-size:13px;color:var(--red)">${fmt(tot)} <span style="color:var(--text3);font-size:11px">(${pct}%)</span></span>
     </div>`;}).join('');
-  document.getElementById('b-cobros').innerHTML=D.cobros.slice().reverse().slice(0,10).map(c=>`<tr><td class="td-mono" style="font-size:12px">${c.fecha}</td><td class="td-main">${c.nombre}</td><td class="td-mono" style="color:var(--green)">${fmt(c.importe)}</td><td><button class="action-btn" onclick="delCobro(${c.id})">✕</button></td></tr>`).join('')||'<tr><td colspan="4"><div class="empty"><p>Sin cobros registrados.</p></div></td></tr>';
+  document.getElementById('b-cobros').innerHTML=D.cobros.slice().reverse().slice(0,10).map(c=>{
+    const cobroId=c.id||c._sbid;
+    return`<tr><td class="td-mono" style="font-size:12px">${c.fecha}</td><td class="td-main">${c.nombre}</td><td class="td-mono" style="color:var(--green)">${fmt(c.importe)}</td><td><button class="btn btn-danger" style="padding:5px 10px;font-size:11px" onclick="delCobro('${cobroId}')">Borrar</button></td></tr>`;
+  }).join('')||'<tr><td colspan="4"><div class="empty"><p>Sin cobros registrados.</p></div></td></tr>';
   const meses=['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
   const año=new Date().getFullYear();
   const gM=meses.map((_,i)=>D.gastos.filter(g=>{const p=g.fecha?.split('/');return p&&parseInt(p[1])-1===i&&parseInt(p[2])===año;}).reduce((s,g)=>s+parseFloat(g.importe||0),0));
