@@ -807,7 +807,26 @@ function addActividad(msg,ref={}){
   queueConfigSave('actividad');
 }
 function actividadExiste(a){
-  if(!a.refType)return true;
+  if(!a.refType){
+    const msg=a.msg||'';
+    if(msg.startsWith('Producto guardado: ')||msg.startsWith('Presupuesto guardado: ')){
+      const nombre=msg.replace('Producto guardado: ','').replace('Presupuesto guardado: ','').trim();
+      return D.catalogo.some(x=>x.nombre===nombre);
+    }
+    if(msg.startsWith('Cobrado: ')){
+      const nombre=msg.replace('Cobrado: ','').split(' — ')[0].trim();
+      return D.cobros.some(x=>x.nombre===nombre);
+    }
+    if(msg.startsWith('Filamento añadido: ')){
+      const nombre=msg.replace('Filamento añadido: ','').trim();
+      return D.filamentos.some(x=>x.nombre===nombre);
+    }
+    if(msg.startsWith('Gasto añadido: ')){
+      const desc=msg.replace('Gasto añadido: ','').split(' — ')[0].trim();
+      return D.gastos.some(x=>x.desc===desc);
+    }
+    return true;
+  }
   if(a.refType==='catalogo')return D.catalogo.some(x=>x.id===a.refId);
   if(a.refType==='filamento')return D.filamentos.some(x=>x.id===a.refId);
   if(a.refType==='consumible')return D.consumibles.some(x=>x.id===a.refId);
@@ -936,7 +955,9 @@ function renderDashboard(){
   // Actividad
   const daEl2=document.getElementById('dash-actividad');
   const dots={guardar:'var(--accent)',cobro:'var(--green)',gasto:'var(--red)',filamento:'var(--amber)'};
+  const actividadAntes=D.actividad.length;
   D.actividad=D.actividad.filter(actividadExiste);
+  if(D.actividad.length!==actividadAntes){save();queueConfigSave('actividad');}
   daEl2.innerHTML=D.actividad.slice(0,8).map(a=>`
     <div class="dash-activity">
       <div class="dash-activity-dot" style="background:${dots[a.tipo]||'var(--text3)'}"></div>
