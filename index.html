@@ -801,10 +801,27 @@ function refreshCatalogoViews(){
   if(catPage&&catPage.classList.contains('active')) renderCatalogo();
   if(ordersPage&&ordersPage.classList.contains('active')) renderPedidos();
 }
-function addActividad(msg){
-  D.actividad.unshift({msg,fecha:today(),ts:Date.now()});
+function addActividad(msg,ref={}){
+  D.actividad.unshift({msg,fecha:today(),ts:Date.now(),...ref});
   if(D.actividad.length>30)D.actividad.pop();
   queueConfigSave('actividad');
+}
+function actividadExiste(a){
+  if(!a.refType)return true;
+  if(a.refType==='catalogo')return D.catalogo.some(x=>x.id===a.refId);
+  if(a.refType==='filamento')return D.filamentos.some(x=>x.id===a.refId);
+  if(a.refType==='consumible')return D.consumibles.some(x=>x.id===a.refId);
+  if(a.refType==='gasto')return D.gastos.some(x=>x.id===a.refId);
+  if(a.refType==='cobro')return D.cobros.some(x=>x.id===a.refId||x._sbid===a.refId);
+  return true;
+}
+function limpiarActividad(refType,refId,nombre=''){
+  const before=D.actividad.length;
+  D.actividad=D.actividad.filter(a=>{
+    if(a.refType===refType&&a.refId===refId)return false;
+    return !(nombre&&a.msg&&a.msg.includes(nombre));
+  });
+  if(D.actividad.length!==before)queueConfigSave('actividad');
 }
 function stockColor(pct){if(pct>40)return'stock-ok';if(pct>15)return'stock-low';return'stock-empty';}
 function stockPct(f){return Math.min(100,Math.round((f.stock/f.peso)*100));}
@@ -919,6 +936,7 @@ function renderDashboard(){
   // Actividad
   const daEl2=document.getElementById('dash-actividad');
   const dots={guardar:'var(--accent)',cobro:'var(--green)',gasto:'var(--red)',filamento:'var(--amber)'};
+  D.actividad=D.actividad.filter(actividadExiste);
   daEl2.innerHTML=D.actividad.slice(0,8).map(a=>`
     <div class="dash-activity">
       <div class="dash-activity-dot" style="background:${dots[a.tipo]||'var(--text3)'}"></div>
@@ -1144,8 +1162,7 @@ function guardarEnCatalogo(){
   const item={id:D.nextId.cat++,nombre,cliente,contacto,entrega,anticipo,notasDoc,materiales:mats.join(' + '),gramos:gramos.toFixed(1),tiempo:Math.floor(h)+'h '+Math.floor(min)+'min',coste:total,precioCalc,precioAcordado:'',estado:'Presupuesto',fecha:today(),notas:'',usosFilamentos,usosConsumibles,stockDescontado:false};
   D.catalogo.push(item);
   saveToSupabase('catalogo',item);
-  addActividad(`Presupuesto guardado: ${nombre}`,{tipo:'guardar'});
-  D.actividad[0].tipo='guardar';
+  addActividad(`Presupuesto guardado: ${nombre}`,{tipo:'guardar',refType:'catalogo',refId:item.id});
   save();queueConfigSave('actividad');notify(`"${nombre}" guardado como presupuesto`);
   limpiarCalculadora();
 }
@@ -1221,7 +1238,7 @@ function saveFilamento(id){
     const g={id:D.nextId.gasto++,fecha:today(),cat:'Filamento',desc:f.nombre+' — '+f.material+' '+f.color,prov:f.marca+(f.proveedor?' / '+f.proveedor:''),importe:f.precio,origen:'Filamentos'};
     D.gastos.push(g);
     saveToSupabase('gastos',g);
-    addActividad('Filamento añadido: '+f.nombre);D.actividad[0].tipo='filamento';
+    addActividad('Filamento añadido: '+f.nombre,{tipo:'filamento',refType:'filamento',refId:f.id});
   }
   save();queueConfigSave('actividad');closeModal();renderFilamentos();notify(id?'Filamento actualizado':'Filamento añadido y gasto registrado');
 }
@@ -1250,7 +1267,7 @@ function editFilamento(id){
       <button class="btn btn-ghost" onclick="closeModal()">Cancelar</button>
     </div>`);
 }
-function delFilamento(id){if(!confirm('¿Borrar?'))return;const f=D.filamentos.find(x=>x.id===id);if(f&&f._sbid)deleteFromSupabase('filamentos',f._sbid);D.filamentos=D.filamentos.filter(f=>f.id!==id);save();renderFilamentos();notify('Filamento eliminado');}
+function delFilamento(id){if(!confirm('¿Borrar?'))return;const f=D.filamentos.find(x=>x.id===id);if(f&&f._sbid)deleteFromSupabase('filamentos',f._sbid);limpiarActividad('filamento',id,f?.nombre);D.filamentos=D.filamentos.filter(f=>f.id!==id);save();renderFilamentos();notify('Filamento eliminado');}
 
 // ══════════════════════════════════════════════════════
 // CONSUMIBLES
@@ -1313,7 +1330,7 @@ function editConsumible(id){
     <div class="form-row cols2"><div><label>Proveedor</label><input type="text" id="mc-prov" value="${c.proveedor||''}"></div><div><label>Link</label><input type="text" id="mc-link" value="${c.link||''}"></div></div>
     <div style="display:flex;gap:8px;margin-top:10px"><button class="btn btn-primary" style="flex:1" onclick="saveConsumible(${id})">Guardar</button><button class="btn btn-ghost" onclick="closeModal()">Cancelar</button></div>`);
 }
-function delConsumible(id){if(!confirm('¿Borrar?'))return;const c=D.consumibles.find(x=>x.id===id);if(c&&c._sbid)deleteFromSupabase('consumibles',c._sbid);D.consumibles=D.consumibles.filter(c=>c.id!==id);save();renderConsumibles();notify('Consumible eliminado');}
+function delConsumible(id){if(!confirm('¿Borrar?'))return;const c=D.consumibles.find(x=>x.id===id);if(c&&c._sbid)deleteFromSupabase('consumibles',c._sbid);limpiarActividad('consumible',id,c?.nombre);D.consumibles=D.consumibles.filter(c=>c.id!==id);save();renderConsumibles();notify('Consumible eliminado');}
 
 // ══════════════════════════════════════════════════════
 // CATÁLOGO
@@ -1364,12 +1381,12 @@ function setEstado(id,estado){
     const cobro = {id:Date.now(),itemId:item.id,fecha:today(),nombre:item.nombre,cliente:item.cliente||'',importe:pa};
     D.cobros.push(cobro);
     saveToSupabase('cobros', cobro);
-    addActividad('Cobrado: '+item.nombre+' — '+fmt(pa));D.actividad[0].tipo='cobro';
+    addActividad('Cobrado: '+item.nombre+' — '+fmt(pa),{tipo:'cobro',refType:'cobro',refId:cobro.id});
     notify('"'+item.nombre+'" cobrado — '+fmt(pa));
   }
   item.estado=estado;if(item._sbid)saveToSupabase('catalogo',item,item._sbid);save();refreshCatalogoViews();
 }
-function delCatalogo(id){if(!confirm('¿Borrar?'))return;const item=D.catalogo.find(x=>x.id===id);if(item&&item._sbid)deleteFromSupabase('catalogo',item._sbid);D.catalogo=D.catalogo.filter(c=>c.id!==id);save();refreshCatalogoViews();notify('Producto eliminado');}
+function delCatalogo(id){if(!confirm('¿Borrar?'))return;const item=D.catalogo.find(x=>x.id===id);if(item&&item._sbid)deleteFromSupabase('catalogo',item._sbid);limpiarActividad('catalogo',id,item?.nombre);D.catalogo=D.catalogo.filter(c=>c.id!==id);save();refreshCatalogoViews();notify('Producto eliminado');}
 
 // ══════════════════════════════════════════════════════
 // PRESUPUESTO PDF
@@ -1576,16 +1593,17 @@ function addGasto(){
   if(!g.importe){notify('El importe no puede ser 0','error');return;}
   D.gastos.push(g);
   saveToSupabase('gastos', g);
-  addActividad('Gasto añadido: '+g.desc+' — '+fmt(g.importe));D.actividad[0].tipo='gasto';
+  addActividad('Gasto añadido: '+g.desc+' — '+fmt(g.importe),{tipo:'gasto',refType:'gasto',refId:g.id});
   save();queueConfigSave('actividad');renderGastos();
   document.getElementById('g-desc').value='';document.getElementById('g-prov').value='';document.getElementById('g-importe').value='';
   notify('Gasto añadido');
 }
-function delGasto(id){if(!confirm('¿Borrar?'))return;const g=D.gastos.find(x=>x.id===id);if(g&&g._sbid)deleteFromSupabase('gastos',g._sbid);D.gastos=D.gastos.filter(g=>g.id!==id);save();renderGastos();notify('Gasto eliminado');}
+function delGasto(id){if(!confirm('¿Borrar?'))return;const g=D.gastos.find(x=>x.id===id);if(g&&g._sbid)deleteFromSupabase('gastos',g._sbid);limpiarActividad('gasto',id,g?.desc);D.gastos=D.gastos.filter(g=>g.id!==id);save();renderGastos();notify('Gasto eliminado');}
 function delCobro(id){
   if(!confirm('¿Borrar este cobro?'))return;
   const c=D.cobros.find(x=>String(x.id)===String(id)||String(x._sbid)===String(id));
   if(c&&c._sbid)deleteFromSupabase('cobros',c._sbid);
+  if(c)limpiarActividad('cobro',c.id||c._sbid,c.nombre);
   D.cobros=D.cobros.filter(x=>String(x.id)!==String(id)&&String(x._sbid)!==String(id));
   const item=c?D.catalogo.find(p=>p.id===c.itemId)||D.catalogo.find(p=>p.nombre===c.nombre):null;
   if(item&&item.estado==='Cobrado'&&confirm('¿Quieres devolver el pedido a Entregado?')){
