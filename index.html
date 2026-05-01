@@ -126,6 +126,21 @@ tr:hover td{background:var(--bg3);}
 .kanban-card:last-child{margin-bottom:0;}
 .kanban-card-name{font-size:13px;font-weight:500;color:var(--text);margin-bottom:4px;}
 .kanban-card-meta{font-size:11px;color:var(--text3);font-family:var(--mono);}
+.orders-summary{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:16px;}
+.orders-pipeline{display:grid;grid-template-columns:repeat(9,minmax(84px,1fr));gap:8px;margin-bottom:16px;overflow-x:auto;padding-bottom:4px;}
+.orders-step{min-height:56px;background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:9px 10px;display:flex;flex-direction:column;justify-content:space-between;}
+.orders-step.active{border-color:rgba(155,114,240,0.65);background:rgba(124,106,247,0.08);}
+.orders-step-name{font-family:var(--mono);font-size:10px;color:var(--text3);text-transform:uppercase;white-space:nowrap;}
+.orders-step-count{font-family:var(--display);font-size:18px;color:var(--text);line-height:1;}
+.orders-layout{display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:16px;align-items:start;}
+.orders-table td{vertical-align:top;}
+.order-name{color:var(--text);font-weight:700;margin-bottom:3px;}
+.order-meta{font-family:var(--mono);font-size:11px;color:var(--text3);}
+.order-price{font-family:var(--mono);font-size:13px;color:var(--green);font-weight:700;}
+.orders-compact-list{display:flex;flex-direction:column;gap:8px;}
+.orders-compact-item{border:1px solid var(--border);border-radius:8px;padding:10px 12px;background:var(--bg3);}
+.orders-compact-title{font-size:13px;font-weight:600;color:var(--text);margin-bottom:3px;}
+.orders-compact-meta{font-size:11px;color:var(--text3);font-family:var(--mono);}
 
 /* Dashboard */
 .alert-item{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border);}
@@ -172,6 +187,8 @@ tr:hover td{background:var(--bg3);}
   .nav-item{justify-content:center;padding:12px;}
   .main{padding:16px;}
   .grid2,.grid3,.grid4{grid-template-columns:1fr;}
+  .orders-summary,.orders-layout{grid-template-columns:1fr;}
+  .orders-pipeline{grid-template-columns:repeat(9,110px);}
 }
 </style>
 </head>
@@ -348,7 +365,37 @@ tr:hover td{background:var(--bg3);}
 <!-- ══ PEDIDOS KANBAN ══ -->
 <div id="page-pedidos" class="page">
   <div class="page-title">Pedidos <span>/ estado</span></div>
-  <div class="kanban" id="kanban-board"></div>
+  <div class="orders-summary">
+    <div class="stat"><div class="stat-label">Pedidos totales</div><div class="stat-value accent" id="orders-total">0</div><div class="stat-sub">en catalogo</div></div>
+    <div class="stat"><div class="stat-label">En marcha</div><div class="stat-value amber" id="orders-active">0</div><div class="stat-sub">pendientes de acabar</div></div>
+    <div class="stat"><div class="stat-label">Listos / entregados</div><div class="stat-value green" id="orders-ready">0</div><div class="stat-sub">para cerrar</div></div>
+    <div class="stat"><div class="stat-label">Pendiente de cobrar</div><div class="stat-value red" id="orders-unpaid">0 â‚¬</div><div class="stat-sub">no cobrado aun</div></div>
+  </div>
+  <div class="orders-pipeline" id="orders-pipeline"></div>
+  <div class="orders-layout">
+    <div class="card">
+      <div class="section-header">
+        <h2>Pedidos activos</h2>
+        <button class="btn btn-ghost" onclick="renderPedidos()">Actualizar</button>
+      </div>
+      <div class="table-wrap">
+        <table class="orders-table">
+          <thead><tr><th>Pedido</th><th>Precio</th><th>Estado</th><th>Fecha</th><th>Notas</th><th></th></tr></thead>
+          <tbody id="orders-table"></tbody>
+        </table>
+      </div>
+    </div>
+    <div>
+      <div class="card">
+        <div class="card-title">Para revisar</div>
+        <div id="orders-review"></div>
+      </div>
+      <div class="card">
+        <div class="card-title">Cerrados recientes</div>
+        <div id="orders-closed"></div>
+      </div>
+    </div>
+  </div>
 </div>
 
 <!-- ══ GASTOS ══ -->
@@ -663,6 +710,12 @@ function catBadge(c){
 function estadoBadge(e){
   const m={Presupuestado:'badge-blue',Aceptado:'badge-purple',Diseño:'badge-amber','En espera':'badge-gray',Imprimiendo:'badge-amber','Post-procesado':'badge-green',Listo:'badge-green',Entregado:'badge-green',Cobrado:'badge-green'};
   return m[e]||'badge-gray';
+}
+function refreshCatalogoViews(){
+  const catPage=document.getElementById('page-catalogo');
+  const ordersPage=document.getElementById('page-pedidos');
+  if(catPage&&catPage.classList.contains('active')) renderCatalogo();
+  if(ordersPage&&ordersPage.classList.contains('active')) renderPedidos();
 }
 function addActividad(msg){
   D.actividad.unshift({msg,fecha:today(),ts:Date.now()});
@@ -1090,22 +1143,23 @@ function setCF(id,field,val){
     item[field]=val;
     if(item._sbid) saveToSupabase('catalogo',item,item._sbid);
     save();
+    refreshCatalogoViews();
   }
 }
 function setEstado(id,estado){
   const item=D.catalogo.find(c=>c.id===id);if(!item)return;
   if(estado==='Cobrado'){
     const pa=parseFloat(item.precioAcordado)||0;
-    if(pa<=0){notify('Pon el Precio acordado antes de marcar como Cobrado','error');renderCatalogo();return;}
+    if(pa<=0){notify('Pon el Precio acordado antes de marcar como Cobrado','error');refreshCatalogoViews();return;}
     const cobro = {fecha:today(),nombre:item.nombre,importe:pa};
     D.cobros.push(cobro);
     saveToSupabase('cobros', cobro);
     addActividad('Cobrado: '+item.nombre+' — '+fmt(pa));D.actividad[0].tipo='cobro';
     notify('"'+item.nombre+'" cobrado — '+fmt(pa));
   }
-  item.estado=estado;save();renderCatalogo();
+  item.estado=estado;save();refreshCatalogoViews();
 }
-function delCatalogo(id){if(!confirm('¿Borrar?'))return;const item=D.catalogo.find(x=>x.id===id);if(item&&item._sbid)deleteFromSupabase('catalogo',item._sbid);D.catalogo=D.catalogo.filter(c=>c.id!==id);save();renderCatalogo();notify('Producto eliminado');}
+function delCatalogo(id){if(!confirm('¿Borrar?'))return;const item=D.catalogo.find(x=>x.id===id);if(item&&item._sbid)deleteFromSupabase('catalogo',item._sbid);D.catalogo=D.catalogo.filter(c=>c.id!==id);save();refreshCatalogoViews();notify('Producto eliminado');}
 
 // ══════════════════════════════════════════════════════
 // PRESUPUESTO PDF
@@ -1202,21 +1256,64 @@ body{font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;background:#fff;col
 // PEDIDOS KANBAN
 // ══════════════════════════════════════════════════════
 function renderPedidos(){
-  const cols=['Presupuestado','Aceptado','Diseño','En espera','Imprimiendo','Post-procesado','Listo','Entregado','Cobrado'];
-  const board=document.getElementById('kanban-board');
-  board.innerHTML=cols.map(estado=>{
-    const items=D.catalogo.filter(c=>c.estado===estado);
-    return`<div class="kanban-col">
-      <div class="kanban-col-title">
-        <span>${estado}</span>
-        <span style="background:var(--bg4);border-radius:10px;padding:2px 7px;font-size:10px">${items.length}</span>
-      </div>
-      ${items.length?items.map(c=>`<div class="kanban-card">
-        <div class="kanban-card-name">${c.nombre}</div>
-        <div class="kanban-card-meta">${c.materiales||'—'} · ${c.fecha}</div>
-        ${parseFloat(c.precioAcordado)?`<div style="font-family:var(--mono);font-size:12px;color:var(--green);margin-top:4px">${fmt(c.precioAcordado)}</div>`:''}
-      </div>`).join(''):`<div style="font-size:11px;color:var(--text3);text-align:center;padding:16px 0">vacío</div>`}
-    </div>`;}).join('');
+  const cols=ESTADOS;
+  const activeStates=['Aceptado','Diseño','En espera','Imprimiendo','Post-procesado'];
+  const readyStates=['Listo','Entregado'];
+  const open=D.catalogo.filter(c=>c.estado!=='Cobrado');
+  const active=D.catalogo.filter(c=>activeStates.includes(c.estado));
+  const ready=D.catalogo.filter(c=>readyStates.includes(c.estado));
+  const unpaid=D.catalogo.filter(c=>c.estado!=='Cobrado').reduce((s,c)=>s+(parseFloat(c.precioAcordado)||parseFloat(c.precioCalc)||0),0);
+
+  document.getElementById('orders-total').textContent=D.catalogo.length;
+  document.getElementById('orders-active').textContent=active.length;
+  document.getElementById('orders-ready').textContent=ready.length;
+  document.getElementById('orders-unpaid').textContent=fmt(unpaid);
+
+  document.getElementById('orders-pipeline').innerHTML=cols.map(estado=>{
+    const n=D.catalogo.filter(c=>c.estado===estado).length;
+    return `<div class="orders-step ${n?'active':''}">
+      <div class="orders-step-name">${estado}</div>
+      <div class="orders-step-count">${n}</div>
+    </div>`;
+  }).join('');
+
+  const tbody=document.getElementById('orders-table');
+  const rows=open.slice().reverse();
+  if(!rows.length){
+    tbody.innerHTML='<tr><td colspan="6"><div class="empty"><p>No hay pedidos abiertos.</p></div></td></tr>';
+  } else {
+    tbody.innerHTML=rows.map(c=>`<tr>
+      <td>
+        <div class="order-name">${c.nombre}</div>
+        <div class="order-meta">${c.materiales||'--'}</div>
+      </td>
+      <td>
+        <input type="number" value="${c.precioAcordado||''}" placeholder="${parseFloat(c.precioCalc||0).toFixed(2)}" step="0.01" style="width:92px;padding:5px 7px;font-size:12px;font-family:var(--mono)" onchange="setCF(${c.id},'precioAcordado',parseFloat(this.value)||'')">
+        <div class="order-meta">calc. ${fmt(c.precioCalc)}</div>
+      </td>
+      <td><select style="font-size:12px;padding:5px 7px;min-width:140px" onchange="setEstado(${c.id},this.value)">${ESTADOS.map(e=>`<option${e===c.estado?' selected':''}>${e}</option>`).join('')}</select></td>
+      <td class="order-meta">${c.fecha||'--'}</td>
+      <td><input type="text" value="${c.notas||''}" placeholder="notas..." style="width:130px;padding:5px 7px;font-size:12px" onchange="setCF(${c.id},'notas',this.value)"></td>
+      <td style="white-space:nowrap">
+        <button class="btn btn-pdf" onclick="generarPDF(${c.id})">PDF</button>
+        <button class="action-btn" onclick="delCatalogo(${c.id})" style="margin-left:4px">✕</button>
+      </td>
+    </tr>`).join('');
+  }
+
+  const review=D.catalogo.filter(c=>['Presupuestado','Listo','Entregado'].includes(c.estado)).slice().reverse().slice(0,6);
+  document.getElementById('orders-review').innerHTML=review.length?`<div class="orders-compact-list">${review.map(c=>`
+    <div class="orders-compact-item">
+      <div class="orders-compact-title">${c.nombre}</div>
+      <div class="orders-compact-meta">${c.estado} · ${fmt(parseFloat(c.precioAcordado)||parseFloat(c.precioCalc)||0)}</div>
+    </div>`).join('')}</div>`:'<div class="empty" style="padding:18px 8px"><p>Nada pendiente de revisar.</p></div>';
+
+  const closed=D.catalogo.filter(c=>c.estado==='Cobrado').slice().reverse().slice(0,5);
+  document.getElementById('orders-closed').innerHTML=closed.length?`<div class="orders-compact-list">${closed.map(c=>`
+    <div class="orders-compact-item">
+      <div class="orders-compact-title">${c.nombre}</div>
+      <div class="orders-compact-meta">${c.fecha||'--'} · ${fmt(parseFloat(c.precioAcordado)||parseFloat(c.precioCalc)||0)}</div>
+    </div>`).join('')}</div>`:'<div class="empty" style="padding:18px 8px"><p>Aun no hay pedidos cobrados.</p></div>';
 }
 
 // ══════════════════════════════════════════════════════
