@@ -3,6 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex,nofollow">
 <title>Kurin Lab — 3D Printing Lab</title>
 
 <style>
@@ -161,6 +162,11 @@ tr:hover td{background:var(--bg3);}
 .notif.show{transform:translateY(0);opacity:1;}
 .notif.success{border-left:3px solid var(--green);}
 .notif.error{border-left:3px solid var(--red);}
+.save-status{position:fixed;right:18px;top:18px;z-index:9998;background:var(--bg2);border:1px solid var(--border);border-radius:999px;padding:6px 10px;font-size:11px;font-family:var(--mono);color:var(--text3);opacity:0;transform:translateY(-8px);transition:all 0.2s;pointer-events:none;}
+.save-status.show{opacity:1;transform:translateY(0);}
+.save-status.saving{color:var(--amber);border-color:rgba(245,158,11,0.35);}
+.save-status.saved{color:var(--green);border-color:rgba(34,197,94,0.35);}
+.save-status.error{color:var(--red);border-color:rgba(239,68,68,0.35);}
 
 .action-btn{background:none;border:none;color:var(--text3);cursor:pointer;padding:3px 6px;border-radius:4px;font-size:12px;transition:all 0.15s;}
 .action-btn:hover{color:var(--red);background:rgba(239,68,68,0.1);}
@@ -212,6 +218,7 @@ tr:hover td{background:var(--bg3);}
   .stock-bar-wrap{width:62px;}
   #modal-box{width:calc(100vw - 24px);max-width:calc(100vw - 24px);padding:18px;border-radius:12px;}
   .notif{left:12px;right:12px;bottom:86px;max-width:none;}
+  .save-status{top:10px;right:10px;}
 }
 
 @media(max-width:480px){
@@ -390,8 +397,8 @@ tr:hover td{background:var(--bg3);}
   <div style="margin-bottom:14px;display:flex;gap:8px;flex-wrap:wrap">
     <select id="filtro-estado" onchange="renderCatalogo()" style="width:200px">
       <option value="">Todos los estados</option>
-      <option>Presupuestado</option><option>Aceptado</option><option>Diseño</option>
-      <option>En espera</option><option>Imprimiendo</option><option>Post-procesado</option>
+      <option>Presupuesto</option><option>Aceptado</option><option>Diseño</option>
+      <option>Preparando</option><option>Imprimiendo</option><option>Post</option>
       <option>Listo</option><option>Entregado</option><option>Cobrado</option>
     </select>
   </div>
@@ -545,6 +552,7 @@ tr:hover td{background:var(--bg3);}
 </style>
 
 <div class="notif" id="notif"></div>
+<div class="save-status" id="save-status">Guardado</div>
 <div id="modal-overlay" onclick="if(event.target===this)closeModal()">
   <div id="modal-box"></div>
 </div>
@@ -609,6 +617,7 @@ async function loadAllData() {
     D.filamentos = fils.map(r => ({...r.data, _sbid: r.id}));
     D.consumibles = cons.map(r => ({...r.data, _sbid: r.id}));
     D.catalogo = cats.map(r => ({...r.data, _sbid: r.id}));
+    D.catalogo.forEach(c=>{c.estado=normalizeEstado(c.estado);});
     D.gastos = gasts.map(r => ({...r.data, _sbid: r.id}));
     D.cobros = cobrs.map(r => ({id:r.data?.id||r.id, ...r.data, _sbid: r.id}));
     
@@ -643,6 +652,7 @@ async function loadAllData() {
 
 async function saveToSupabase(table, item, sbid=null) {
   try {
+    setSaveStatus('saving');
     const data = {...item};
     delete data._sbid;
     if(sbid) {
@@ -651,27 +661,35 @@ async function saveToSupabase(table, item, sbid=null) {
       const res = await sb(table, 'POST', {data});
       if(res && res[0]) item._sbid = res[0].id;
     }
+    setSaveStatus('saved');
   } catch(e) {
     console.error('Save error:', e);
+    setSaveStatus('error');
     notify('Error guardando: ' + e.message, 'error');
   }
 }
 
 async function deleteFromSupabase(table, sbid) {
   try {
+    setSaveStatus('saving');
     await sb(table, 'DELETE', null, `?id=eq.${sbid}`);
+    setSaveStatus('saved');
   } catch(e) {
     console.error('Delete error:', e);
+    setSaveStatus('error');
   }
 }
 
 async function saveConfig(clave, valor) {
   try {
+    setSaveStatus('saving');
     // Upsert
     await sb('configuracion', 'DELETE', null, `?clave=eq.${encodeURIComponent(clave)}`);
     await sb('configuracion', 'POST', {clave, valor});
+    setSaveStatus('saved');
   } catch(e) {
     console.error('Config save error:', e);
+    setSaveStatus('error');
   }
 }
 
@@ -703,6 +721,7 @@ if(!D.actividad) D.actividad=[];
 if(!D.stockMovs) D.stockMovs=[];
 if(!D.settings) D.settings=JSON.parse(JSON.stringify(DEF.settings));
 if(!D.settings.logo) D.settings.logo="";
+D.catalogo.forEach(c=>{c.estado=normalizeEstado(c.estado);});
 D.filamentos.forEach(f=>{if(f.stock===undefined)f.stock=f.peso;});
 D.consumibles.forEach(c=>{if(c.stock===undefined)c.stock=c.uds;});
 
@@ -727,15 +746,20 @@ async function connectManualKey() {
   }
 }
 
+let configSaveTimer=null;
+const pendingConfigKeys=new Set();
+function queueConfigSave(...keys){
+  keys.forEach(k=>pendingConfigKeys.add(k));
+  if(configSaveTimer)clearTimeout(configSaveTimer);
+  configSaveTimer=setTimeout(flushConfigSave,700);
+}
+function flushConfigSave(){
+  if(!SUPABASE_KEY||!pendingConfigKeys.size)return;
+  const values={settings:D.settings,actividad:D.actividad,multiplicadores:D.multiplicadores,stockMovs:D.stockMovs};
+  const keys=[...pendingConfigKeys];pendingConfigKeys.clear();
+  keys.forEach(k=>saveConfig(k,values[k]));
+}
 function save() {
-  // Save settings and config to Supabase async
-  if(SUPABASE_KEY) {
-    saveConfig('settings', D.settings);
-    saveConfig('actividad', D.actividad);
-    saveConfig('multiplicadores', D.multiplicadores);
-    saveConfig('stockMovs', D.stockMovs);
-  }
-  // Keep localStorage as fallback
   try { localStorage.setItem('print3d_v2', JSON.stringify(D)); } catch(e) {}
 }
 
@@ -750,13 +774,26 @@ function notify(msg,type='success'){
   n.textContent=msg;n.className='notif show '+type;
   setTimeout(()=>n.classList.remove('show'),3200);
 }
+let saveStatusTimer=null;
+function setSaveStatus(state){
+  const el=document.getElementById('save-status');if(!el)return;
+  const labels={saving:'Guardando...',saved:'Guardado',error:'Error al guardar'};
+  el.textContent=labels[state]||'Guardado';
+  el.className='save-status show '+state;
+  if(saveStatusTimer)clearTimeout(saveStatusTimer);
+  if(state!=='saving')saveStatusTimer=setTimeout(()=>el.classList.remove('show'),1600);
+}
 function catBadge(c){
   const m={Filamento:'badge-purple',Accesorio:'badge-amber',Impresora:'badge-blue',Herramienta:'badge-blue',Suscripcion:'badge-green',Envio:'badge-green',Otro:'badge-gray'};
   return m[c]||'badge-gray';
 }
+function normalizeEstado(e){
+  const m={'Presupuestado':'Presupuesto','En espera':'Preparando','Post-procesado':'Post'};
+  return m[e]||e||'Presupuesto';
+}
 function estadoBadge(e){
-  const m={Presupuestado:'badge-blue',Aceptado:'badge-purple',Diseño:'badge-amber','En espera':'badge-gray',Imprimiendo:'badge-amber','Post-procesado':'badge-green',Listo:'badge-green',Entregado:'badge-green',Cobrado:'badge-green'};
-  return m[e]||'badge-gray';
+  const m={Presupuesto:'badge-blue',Aceptado:'badge-purple',Diseño:'badge-amber',Preparando:'badge-gray',Imprimiendo:'badge-amber',Post:'badge-green',Listo:'badge-green',Entregado:'badge-green',Cobrado:'badge-green'};
+  return m[normalizeEstado(e)]||'badge-gray';
 }
 function refreshCatalogoViews(){
   const catPage=document.getElementById('page-catalogo');
@@ -767,6 +804,7 @@ function refreshCatalogoViews(){
 function addActividad(msg){
   D.actividad.unshift({msg,fecha:today(),ts:Date.now()});
   if(D.actividad.length>30)D.actividad.pop();
+  queueConfigSave('actividad');
 }
 function stockColor(pct){if(pct>40)return'stock-ok';if(pct>15)return'stock-low';return'stock-empty';}
 function stockPct(f){return Math.min(100,Math.round((f.stock/f.peso)*100));}
@@ -777,6 +815,7 @@ function notifyLowConsumibles(items){
 function addStockMov(tipo,item,cantidad,producto){
   D.stockMovs.unshift({fecha:today(),ts:Date.now(),tipo,nombre:item.nombre,cantidad,restante:item.stock||0,producto});
   if(D.stockMovs.length>120)D.stockMovs.pop();
+  queueConfigSave('stockMovs');
 }
 
 // ══════════════════════════════════════════════════════
@@ -800,7 +839,7 @@ function toggleTheme(){
   const isDark=h.dataset.theme==='dark';
   h.dataset.theme=isDark?'light':'dark';
   document.getElementById('theme-icon').textContent=isDark?'🌙':'☀';
-  D.settings.theme=isDark?'light':'dark';save();
+  D.settings.theme=isDark?'light':'dark';save();queueConfigSave('settings');
 }
 if(D.settings&&D.settings.theme){
   document.documentElement.dataset.theme=D.settings.theme;
@@ -819,7 +858,7 @@ function renderDashboard(){
   sdEl.className='stat-value '+(saldo>=0?'green':'red');
   document.getElementById('dash-saldo-sub').textContent=saldo>=0?'En positivo':'Recuperando inversión';
 
-  const activos=D.catalogo.filter(c=>!['Cobrado','Entregado','Presupuestado'].includes(c.estado));
+  const activos=D.catalogo.filter(c=>!['Cobrado','Entregado','Presupuesto'].includes(normalizeEstado(c.estado)));
   document.getElementById('dash-activos').textContent=activos.length;
 
   const mes=new Date().getMonth()+1;const año=new Date().getFullYear();
@@ -831,13 +870,13 @@ function renderDashboard(){
   const alert=D.settings.stockAlert||150;
   const bajos=D.filamentos.filter(f=>f.stock<=alert);
   const conBajos=D.consumibles.filter(c=>(parseFloat(c.stock)||0)<5);
-  const listos=D.catalogo.filter(c=>c.estado==='Listo');
-  const entregados=D.catalogo.filter(c=>c.estado==='Entregado');
+  const listos=D.catalogo.filter(c=>normalizeEstado(c.estado)==='Listo');
+  const entregados=D.catalogo.filter(c=>normalizeEstado(c.estado)==='Entregado');
   document.getElementById('dash-stock-n').textContent=bajos.length+conBajos.length;
 
   // Pedidos activos
   const dpEl=document.getElementById('dash-pedidos');
-  const actPedidos=D.catalogo.filter(c=>!['Cobrado','Entregado','Presupuestado'].includes(c.estado)).slice(0,6);
+  const actPedidos=D.catalogo.filter(c=>!['Cobrado','Entregado','Presupuesto'].includes(normalizeEstado(c.estado))).slice(0,6);
   dpEl.innerHTML=actPedidos.length?actPedidos.map(c=>`
     <div class="dash-activity" style="cursor:default">
       <div class="dash-activity-dot" style="background:var(--accent)"></div>
@@ -937,7 +976,7 @@ function renderMultRows(){
   const m=D.multiplicadores[0];
   el.innerHTML=`<div style="display:flex;align-items:center;gap:12px;padding:12px 0">
     <span style="font-family:var(--mono);color:var(--text3);font-size:16px">×</span>
-    <input type="number" style="width:80px;padding:8px 10px;font-size:18px;font-family:var(--mono);text-align:center;font-weight:700;color:var(--accent2)" value="${m.mult}" step="0.1" min="0.1" onchange="D.multiplicadores[0].mult=parseFloat(this.value)||1;save();calcular()">
+    <input type="number" style="width:80px;padding:8px 10px;font-size:18px;font-family:var(--mono);text-align:center;font-weight:700;color:var(--accent2)" value="${m.mult}" step="0.1" min="0.1" onchange="D.multiplicadores[0].mult=parseFloat(this.value)||1;save();queueConfigSave('multiplicadores');calcular()">
     <div style="flex:1">
       <div style="font-size:11px;color:var(--text3);font-family:var(--mono);margin-bottom:2px">PRECIO FINAL</div>
       <div style="font-family:var(--display);font-size:28px;font-weight:800;color:var(--green);letter-spacing:-1px" id="mp-0">—</div>
@@ -992,6 +1031,74 @@ function calcular(){
     if(mbEl)mbEl.textContent='+'+fmt(b);
   }
 }
+function limpiarCalculadora(){
+  ['c-nombre','c-cliente','c-contacto','c-entrega','c-notas-doc'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  const anticipo=document.getElementById('c-anticipo');if(anticipo)anticipo.value='0';
+  const horas=document.getElementById('c-horas');if(horas)horas.value='1';
+  const minutos=document.getElementById('c-minutos');if(minutos)minutos.value='30';
+  for(let i=0;i<4;i++){
+    const sel=document.getElementById(`cf-sel-${i}`);const g=document.getElementById(`cf-g-${i}`);
+    if(sel)sel.value='';
+    if(g)g.value='0';
+  }
+  for(let i=0;i<3;i++){
+    const sel=document.getElementById(`cc-sel-${i}`);const q=document.getElementById(`cc-q-${i}`);
+    if(sel)sel.value='';
+    if(q)q.value='0';
+  }
+  calcular();
+}
+function descontarStockPedido(item){
+  if(item.stockDescontado)return;
+  const totalUsos=(item.usosFilamentos||[]).length+(item.usosConsumibles||[]).length;
+  if(!totalUsos&&!confirm('Este pedido no tiene materiales ni consumibles registrados. ¿Aceptarlo igualmente?'))return false;
+  const lowConsumibles=[];
+  (item.usosFilamentos||[]).forEach(u=>{
+    const fil=D.filamentos.find(f=>f.id===u.id)||D.filamentos.find(f=>f.nombre===u.nombre);
+    if(!fil)return;
+    const cantidad=parseFloat(u.cantidad)||0;
+    fil.stock=Math.max(0,(fil.stock||0)-cantidad);
+    addStockMov('Filamento',fil,cantidad,item.nombre);
+    if(fil._sbid)saveToSupabase('filamentos',fil,fil._sbid);
+  });
+  (item.usosConsumibles||[]).forEach(u=>{
+    const con=D.consumibles.find(c=>c.id===u.id)||D.consumibles.find(c=>c.nombre===u.nombre);
+    if(!con)return;
+    const cantidad=parseFloat(u.cantidad)||0;
+    con.stock=Math.max(0,(con.stock||0)-cantidad);
+    addStockMov('Consumible',con,cantidad,item.nombre);
+    lowConsumibles.push(con);
+    if(con._sbid)saveToSupabase('consumibles',con,con._sbid);
+  });
+  item.stockDescontado=true;
+  notifyLowConsumibles(lowConsumibles);
+  queueConfigSave('stockMovs');
+  return true;
+}
+function revertirStockPedido(id){
+  const item=D.catalogo.find(c=>c.id===id);if(!item)return;
+  if(!item.stockDescontado){notify('Este pedido no tiene stock descontado','error');return;}
+  if(!confirm('¿Devolver al stock los materiales de este pedido?'))return;
+  (item.usosFilamentos||[]).forEach(u=>{
+    const fil=D.filamentos.find(f=>f.id===u.id)||D.filamentos.find(f=>f.nombre===u.nombre);
+    if(!fil)return;
+    const cantidad=parseFloat(u.cantidad)||0;
+    fil.stock=(parseFloat(fil.stock)||0)+cantidad;
+    addStockMov('Filamento',fil,-cantidad,item.nombre+' (revertido)');
+    if(fil._sbid)saveToSupabase('filamentos',fil,fil._sbid);
+  });
+  (item.usosConsumibles||[]).forEach(u=>{
+    const con=D.consumibles.find(c=>c.id===u.id)||D.consumibles.find(c=>c.nombre===u.nombre);
+    if(!con)return;
+    const cantidad=parseFloat(u.cantidad)||0;
+    con.stock=(parseFloat(con.stock)||0)+cantidad;
+    addStockMov('Consumible',con,-cantidad,item.nombre+' (revertido)');
+    if(con._sbid)saveToSupabase('consumibles',con,con._sbid);
+  });
+  item.stockDescontado=false;
+  if(item._sbid)saveToSupabase('catalogo',item,item._sbid);
+  save();queueConfigSave('stockMovs');refreshCatalogoViews();notify('Stock devuelto');
+}
 function guardarEnCatalogo(){
   const nombre=document.getElementById('c-nombre').value.trim();
   if(!nombre){notify('Pon primero el nombre del producto','error');return;}
@@ -1006,23 +1113,22 @@ function guardarEnCatalogo(){
     const sel=document.getElementById(`cf-sel-${i}`);const gEl=document.getElementById(`cf-g-${i}`);
     const fid=parseInt(sel?.value||0);const g=parseFloat(gEl?.value||0);
     const fil=D.filamentos.find(f=>f.id===fid);
-    if(fil&&g>0){mats.push(fil.nombre);gramos+=g;
-      // Descontar stock
-      fil.stock=Math.max(0,(fil.stock||0)-g);
-      addStockMov('Filamento',fil,g,nombre);
-    }
+    if(fil&&g>0){mats.push(fil.nombre);gramos+=g;}
   }
-  const usedConsumibles=[];
-  // Descontar consumibles
+  const usosFilamentos=[];
+  const usosConsumibles=[];
+  for(let i=0;i<4;i++){
+    const sel=document.getElementById(`cf-sel-${i}`);const gEl=document.getElementById(`cf-g-${i}`);
+    const fid=parseInt(sel?.value||0);const g=parseFloat(gEl?.value||0);
+    const fil=D.filamentos.find(f=>f.id===fid);
+    if(fil&&g>0)usosFilamentos.push({id:fil.id,nombre:fil.nombre,cantidad:g});
+  }
+  // Registrar consumibles previstos
   for(let i=0;i<3;i++){
     const sel=document.getElementById(`cc-sel-${i}`);const qEl=document.getElementById(`cc-q-${i}`);
     const cid=parseInt(sel?.value||0);const q=parseFloat(qEl?.value||0);
     const con=D.consumibles.find(c=>c.id===cid);
-    if(con&&q>0){
-      con.stock=Math.max(0,(con.stock||0)-q);
-      addStockMov('Consumible',con,q,nombre);
-      usedConsumibles.push(con);
-    }
+    if(con&&q>0)usosConsumibles.push({id:con.id,nombre:con.nombre,cantidad:q});
   }
   const h=parseFloat(document.getElementById('c-horas').value||0);
   const min=parseFloat(document.getElementById('c-minutos').value||0);
@@ -1035,21 +1141,13 @@ function guardarEnCatalogo(){
   const total=tFil+th*w/1000*k+tCon;
   const mRef=D.multiplicadores[0];
   const precioCalc=total*(mRef?.mult||3);
-  const item={id:D.nextId.cat++,nombre,cliente,contacto,entrega,anticipo,notasDoc,materiales:mats.join(' + '),gramos:gramos.toFixed(1),tiempo:Math.floor(h)+'h '+Math.floor(min)+'min',coste:total,precioCalc,precioAcordado:'',estado:'Presupuestado',fecha:today(),notas:''};
+  const item={id:D.nextId.cat++,nombre,cliente,contacto,entrega,anticipo,notasDoc,materiales:mats.join(' + '),gramos:gramos.toFixed(1),tiempo:Math.floor(h)+'h '+Math.floor(min)+'min',coste:total,precioCalc,precioAcordado:'',estado:'Presupuesto',fecha:today(),notas:'',usosFilamentos,usosConsumibles,stockDescontado:false};
   D.catalogo.push(item);
   saveToSupabase('catalogo',item);
-  D.filamentos.forEach(f=>{if(f._sbid)saveToSupabase('filamentos',f,f._sbid);});
-  usedConsumibles.forEach(c=>{if(c._sbid)saveToSupabase('consumibles',c,c._sbid);});
-  addActividad(`Producto guardado: ${nombre}`,{tipo:'guardar'});
+  addActividad(`Presupuesto guardado: ${nombre}`,{tipo:'guardar'});
   D.actividad[0].tipo='guardar';
-  save();notify(`"${nombre}" guardado en el Catálogo`);
-  notifyLowConsumibles(usedConsumibles);
-  document.getElementById('c-nombre').value='';
-  document.getElementById('c-cliente').value='';
-  document.getElementById('c-contacto').value='';
-  document.getElementById('c-entrega').value='';
-  document.getElementById('c-anticipo').value='0';
-  document.getElementById('c-notas-doc').value='';
+  save();queueConfigSave('actividad');notify(`"${nombre}" guardado como presupuesto`);
+  limpiarCalculadora();
 }
 
 // ══════════════════════════════════════════════════════
@@ -1125,7 +1223,7 @@ function saveFilamento(id){
     saveToSupabase('gastos',g);
     addActividad('Filamento añadido: '+f.nombre);D.actividad[0].tipo='filamento';
   }
-  save();closeModal();renderFilamentos();notify(id?'Filamento actualizado':'Filamento añadido y gasto registrado');
+  save();queueConfigSave('actividad');closeModal();renderFilamentos();notify(id?'Filamento actualizado':'Filamento añadido y gasto registrado');
 }
 function editFilamento(id){
   const f=D.filamentos.find(x=>x.id===id);
@@ -1220,10 +1318,10 @@ function delConsumible(id){if(!confirm('¿Borrar?'))return;const c=D.consumibles
 // ══════════════════════════════════════════════════════
 // CATÁLOGO
 // ══════════════════════════════════════════════════════
-const ESTADOS=['Presupuestado','Aceptado','Diseño','En espera','Imprimiendo','Post-procesado','Listo','Entregado','Cobrado'];
+const ESTADOS=['Presupuesto','Aceptado','Diseño','Preparando','Imprimiendo','Post','Listo','Entregado','Cobrado'];
 function renderCatalogo(){
-  const filtro=document.getElementById('filtro-estado').value;
-  const items=filtro?D.catalogo.filter(c=>c.estado===filtro):D.catalogo;
+  const filtro=normalizeEstado(document.getElementById('filtro-estado').value);
+  const items=filtro?D.catalogo.filter(c=>normalizeEstado(c.estado)===filtro):D.catalogo;
   const tbody=document.getElementById('cat-table');
   if(!items.length){tbody.innerHTML='<tr><td colspan="10"><div class="empty"><p>No hay productos. Usa la Calculadora para añadir.</p></div></td></tr>';return;}
   tbody.innerHTML=items.slice().reverse().map(c=>`<tr>
@@ -1238,6 +1336,7 @@ function renderCatalogo(){
     <td><input type="text" value="${c.notas||''}" placeholder="notas..." style="width:110px;padding:5px 7px;font-size:12px" onchange="setCF(${c.id},'notas',this.value)"></td>
     <td style="white-space:nowrap">
       <button class="btn btn-pdf" onclick="openDocModal(${c.id})">DOC</button>
+      ${c.stockDescontado?`<button class="btn btn-ghost" style="padding:5px 9px;font-size:11px;margin-left:4px" onclick="revertirStockPedido(${c.id})">Stock</button>`:''}
       <button class="action-btn" onclick="delCatalogo(${c.id})" style="margin-left:4px">✕</button>
     </td>
   </tr>`).join('');
@@ -1253,6 +1352,12 @@ function setCF(id,field,val){
 }
 function setEstado(id,estado){
   const item=D.catalogo.find(c=>c.id===id);if(!item)return;
+  estado=normalizeEstado(estado);
+  if(estado==='Aceptado'&&!item.stockDescontado){
+    const ok=descontarStockPedido(item);
+    if(!ok){refreshCatalogoViews();return;}
+    notify(item.usosFilamentos?.length||item.usosConsumibles?.length?'Pedido aceptado: stock descontado':'Pedido aceptado sin descontar stock');
+  }
   if(estado==='Cobrado'){
     const pa=parseFloat(item.precioAcordado)||0;
     if(pa<=0){notify('Pon el Precio acordado antes de marcar como Cobrado','error');refreshCatalogoViews();return;}
@@ -1262,7 +1367,7 @@ function setEstado(id,estado){
     addActividad('Cobrado: '+item.nombre+' — '+fmt(pa));D.actividad[0].tipo='cobro';
     notify('"'+item.nombre+'" cobrado — '+fmt(pa));
   }
-  item.estado=estado;save();refreshCatalogoViews();
+  item.estado=estado;if(item._sbid)saveToSupabase('catalogo',item,item._sbid);save();refreshCatalogoViews();
 }
 function delCatalogo(id){if(!confirm('¿Borrar?'))return;const item=D.catalogo.find(x=>x.id===id);if(item&&item._sbid)deleteFromSupabase('catalogo',item._sbid);D.catalogo=D.catalogo.filter(c=>c.id!==id);save();refreshCatalogoViews();notify('Producto eliminado');}
 
@@ -1384,12 +1489,12 @@ body{font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;background:#fff;col
 // ══════════════════════════════════════════════════════
 function renderPedidos(){
   const cols=ESTADOS;
-  const activeStates=['Aceptado','Diseño','En espera','Imprimiendo','Post-procesado'];
+  const activeStates=['Aceptado','Diseño','Preparando','Imprimiendo','Post'];
   const readyStates=['Listo','Entregado'];
-  const open=D.catalogo.filter(c=>c.estado!=='Cobrado');
-  const active=D.catalogo.filter(c=>activeStates.includes(c.estado));
-  const ready=D.catalogo.filter(c=>readyStates.includes(c.estado));
-  const unpaid=D.catalogo.filter(c=>c.estado!=='Cobrado').reduce((s,c)=>s+(parseFloat(c.precioAcordado)||parseFloat(c.precioCalc)||0),0);
+  const open=D.catalogo.filter(c=>normalizeEstado(c.estado)!=='Cobrado');
+  const active=D.catalogo.filter(c=>activeStates.includes(normalizeEstado(c.estado)));
+  const ready=D.catalogo.filter(c=>readyStates.includes(normalizeEstado(c.estado)));
+  const unpaid=D.catalogo.filter(c=>normalizeEstado(c.estado)!=='Cobrado').reduce((s,c)=>s+(parseFloat(c.precioAcordado)||parseFloat(c.precioCalc)||0),0);
 
   document.getElementById('orders-total').textContent=D.catalogo.length;
   document.getElementById('orders-active').textContent=active.length;
@@ -1397,7 +1502,7 @@ function renderPedidos(){
   document.getElementById('orders-unpaid').textContent=fmt(unpaid);
 
   document.getElementById('orders-pipeline').innerHTML=cols.map(estado=>{
-    const n=D.catalogo.filter(c=>c.estado===estado).length;
+    const n=D.catalogo.filter(c=>normalizeEstado(c.estado)===estado).length;
     return `<div class="orders-step ${n?'active':''}">
       <div class="orders-step-name">${estado}</div>
       <div class="orders-step-count">${n}</div>
@@ -1427,12 +1532,13 @@ function renderPedidos(){
       <td><input type="text" value="${c.notas||''}" placeholder="notas..." style="width:130px;padding:5px 7px;font-size:12px" onchange="setCF(${c.id},'notas',this.value)"></td>
       <td style="white-space:nowrap">
         <button class="btn btn-pdf" onclick="openDocModal(${c.id})">DOC</button>
+        ${c.stockDescontado?`<button class="btn btn-ghost" style="padding:5px 9px;font-size:11px;margin-left:4px" onclick="revertirStockPedido(${c.id})">Stock</button>`:''}
         <button class="action-btn" onclick="delCatalogo(${c.id})" style="margin-left:4px">✕</button>
       </td>
     </tr>`).join('');
   }
 
-  const review=D.catalogo.filter(c=>['Presupuestado','Listo','Entregado'].includes(c.estado)).slice().reverse().slice(0,6);
+  const review=D.catalogo.filter(c=>['Presupuesto','Listo','Entregado'].includes(normalizeEstado(c.estado))).slice().reverse().slice(0,6);
   document.getElementById('orders-review').innerHTML=review.length?`<div class="orders-compact-list">${review.map(c=>`
     <div class="orders-compact-item">
       <div class="orders-compact-title">${c.nombre}</div>
@@ -1471,7 +1577,7 @@ function addGasto(){
   D.gastos.push(g);
   saveToSupabase('gastos', g);
   addActividad('Gasto añadido: '+g.desc+' — '+fmt(g.importe));D.actividad[0].tipo='gasto';
-  save();renderGastos();
+  save();queueConfigSave('actividad');renderGastos();
   document.getElementById('g-desc').value='';document.getElementById('g-prov').value='';document.getElementById('g-importe').value='';
   notify('Gasto añadido');
 }
@@ -1560,7 +1666,7 @@ function loadLogo(e){
     D.settings.logo=ev.target.result;
     const pb=document.getElementById('logo-preview-box');
     pb.innerHTML=`<img src="${ev.target.result}" style="width:100%;height:100%;object-fit:contain">`;
-    save();notify('Logo cargado');
+    save();queueConfigSave('settings');notify('Logo cargado');
   };
   reader.readAsDataURL(file);
 }
@@ -1573,7 +1679,7 @@ function saveSettings(){
   // Actualizar sidebar
   document.getElementById('app-title').innerHTML=D.settings.nombre.replace('3D','<span>3D</span>');
   if(D.settings.sub)document.getElementById('app-sub').textContent=D.settings.sub;
-  save();notify('Ajustes guardados');
+  save();queueConfigSave('settings');notify('Ajustes guardados');
 }
 
 // ══════════════════════════════════════════════════════
