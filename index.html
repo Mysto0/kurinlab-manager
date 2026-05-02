@@ -49,16 +49,6 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:14
 .page.active{display:block;}
 .page-title{font-family:var(--display);font-size:22px;font-weight:900;letter-spacing:-0.5px;margin-bottom:24px;color:var(--text);}
 .page-title span{color:var(--accent2);}
-.top-tools{display:flex;gap:10px;align-items:flex-start;margin-bottom:16px;flex-wrap:wrap;}
-.global-search{position:relative;max-width:360px;flex:1;min-width:240px;}
-.global-search input{padding-left:34px;}
-.global-search:before{content:"⌕";position:absolute;left:12px;top:9px;color:var(--text3);z-index:1;font-family:var(--mono);}
-.search-results{position:absolute;left:0;right:0;top:calc(100% + 6px);background:var(--bg2);border:1px solid var(--border2);border-radius:8px;box-shadow:0 16px 40px rgba(0,0,0,.35);z-index:900;display:none;max-height:280px;overflow:auto;}
-.search-results.show{display:block;}
-.search-hit{padding:10px 12px;border-bottom:1px solid var(--border);cursor:pointer;}
-.search-hit:hover{background:var(--bg3);}
-.search-hit-title{font-size:13px;font-weight:700;color:var(--text);}
-.search-hit-meta{font-size:11px;color:var(--text3);margin-top:2px;}
 .state-chip{display:inline-flex;align-items:center;gap:5px;}
 .state-dot{width:7px;height:7px;border-radius:50%;background:var(--text3);}
 .state-dot.presupuesto{background:#60a5fa}.state-dot.aceptado{background:var(--accent)}.state-dot.diseno{background:var(--amber)}.state-dot.preparando{background:#9ca3af}.state-dot.imprimiendo{background:#f97316}.state-dot.post{background:#14b8a6}.state-dot.listo{background:#22c55e}.state-dot.entregado{background:#16a34a}.state-dot.cobrado{background:#00ff66}.state-dot.cancelado{background:var(--red);}
@@ -286,13 +276,6 @@ tr:hover td{background:var(--bg3);}
 
 <!-- MAIN -->
 <main class="main">
-<div class="top-tools">
-  <div class="global-search">
-    <input type="text" id="global-search" placeholder="Buscar producto, cliente o material..." oninput="renderGlobalSearch()" onfocus="renderGlobalSearch()">
-    <div class="search-results" id="global-results"></div>
-  </div>
-</div>
-
 <!-- ══ DASHBOARD ══ -->
 <div id="page-dashboard" class="page active">
   <div class="page-title">Dashboard <span>/ resumen</span></div>
@@ -427,6 +410,7 @@ tr:hover td{background:var(--bg3);}
       <h2>Herramientas, accesorios y extras</h2>
       <button class="btn btn-primary" onclick="addMaterialExtra()">+ Añadir</button>
     </div>
+    <div style="margin-bottom:14px"><input type="text" id="mat-search" placeholder="Buscar material, marca o tienda..." oninput="renderMaterialesExtra()" style="max-width:300px"></div>
     <div class="table-wrap">
       <table>
         <thead><tr><th>Nombre</th><th>Tipo</th><th>Marca</th><th>Compra</th><th>Cantidad</th><th>Precio</th><th>Unidad</th><th>Link</th><th></th></tr></thead>
@@ -440,6 +424,7 @@ tr:hover td{background:var(--bg3);}
 <div id="page-catalogo" class="page">
   <div class="page-title">Catálogo <span>/ productos</span></div>
   <div style="margin-bottom:14px;display:flex;gap:8px;flex-wrap:wrap">
+    <input type="text" id="cat-search" placeholder="Buscar producto, cliente o material..." oninput="renderCatalogo()" style="max-width:300px">
     <select id="filtro-estado" onchange="renderCatalogo()" style="width:200px">
       <option value="activos" selected>Activos</option>
       <option value="">Todos los estados</option>
@@ -462,6 +447,9 @@ tr:hover td{background:var(--bg3);}
 <!-- ══ PEDIDOS KANBAN ══ -->
 <div id="page-pedidos" class="page">
   <div class="page-title">Pedidos <span>/ estado</span></div>
+  <div style="margin-bottom:14px;display:flex;gap:8px;flex-wrap:wrap">
+    <input type="text" id="orders-search" placeholder="Buscar pedido o cliente..." oninput="renderPedidos()" style="max-width:300px">
+  </div>
   <div class="orders-summary">
     <div class="stat"><div class="stat-label">Pedidos totales</div><div class="stat-value accent" id="orders-total">0</div><div class="stat-sub">en catalogo</div></div>
     <div class="stat"><div class="stat-label">En marcha</div><div class="stat-value amber" id="orders-active">0</div><div class="stat-sub">pendientes de acabar</div></div>
@@ -1042,23 +1030,6 @@ function estadoLabel(e){
   const st=normalizeEstado(e);
   return `<span class="state-chip"><span class="state-dot ${estadoClass(st)}"></span>${st}</span>`;
 }
-function renderGlobalSearch(){
-  const q=(document.getElementById('global-search')?.value||'').toLowerCase().trim();
-  const box=document.getElementById('global-results');
-  if(!box)return;
-  if(q.length<2){box.classList.remove('show');box.innerHTML='';return;}
-  const hits=[];
-  D.catalogo.forEach(c=>{
-    const hay=`${c.nombre||''} ${c.cliente||''} ${c.contacto||''} ${c.materiales||''} ${c.estado||''}`.toLowerCase();
-    if(hay.includes(q))hits.push({title:c.nombre,meta:`${c.cliente||'Sin cliente'} · ${normalizeEstado(c.estado)}`,page:normalizeEstado(c.estado)==='Cobrado'?'ventas':'catalogo'});
-  });
-  D.filamentos.forEach(f=>{if(`${f.nombre} ${f.material} ${f.color} ${f.marca}`.toLowerCase().includes(q))hits.push({title:f.nombre,meta:`Filamento · ${f.stock||0}g`,page:'filamentos'});});
-  D.consumibles.forEach(c=>{if(`${c.nombre} ${c.desc||''} ${c.proveedor||''}`.toLowerCase().includes(q))hits.push({title:c.nombre,meta:`Consumible · ${c.stock||0} uds`,page:'consumibles'});});
-  D.materiales.forEach(m=>{if(`${m.nombre} ${m.tipo||''} ${m.marca||''} ${m.proveedor||''}`.toLowerCase().includes(q))hits.push({title:m.nombre,meta:`Material · ${m.tipo||'Otro'}`,page:'materiales'});});
-  box.innerHTML=hits.slice(0,8).map(h=>`<div class="search-hit" onclick="navigateTo('${h.page}');document.getElementById('global-search').value='';document.getElementById('global-results').classList.remove('show')"><div class="search-hit-title">${h.title}</div><div class="search-hit-meta">${h.meta}</div></div>`).join('')||'<div class="search-hit"><div class="search-hit-meta">Sin resultados</div></div>';
-  box.classList.add('show');
-}
-
 // ══════════════════════════════════════════════════════
 // THEME
 // ══════════════════════════════════════════════════════
@@ -1552,8 +1523,10 @@ function delConsumible(id){if(!confirm('¿Borrar? También se quitará del Balan
 // ══════════════════════════════════════════════════════
 function renderMaterialesExtra(){
   const tbody=document.getElementById('mat-table');
-  if(!D.materiales.length){tbody.innerHTML='<tr><td colspan="9"><div class="empty"><p>No hay herramientas ni materiales extra.</p></div></td></tr>';return;}
-  tbody.innerHTML=D.materiales.slice().reverse().map(m=>`
+  const search=(document.getElementById('mat-search')?.value||'').toLowerCase().trim();
+  const items=D.materiales.filter(m=>!search||`${m.nombre||''} ${m.tipo||''} ${m.marca||''} ${m.proveedor||''}`.toLowerCase().includes(search));
+  if(!items.length){tbody.innerHTML='<tr><td colspan="9"><div class="empty"><p>No hay herramientas ni materiales extra.</p></div></td></tr>';return;}
+  tbody.innerHTML=items.slice().reverse().map(m=>`
     <tr>
       <td class="td-main">${m.nombre}</td>
       <td><span class="badge ${catBadge(m.tipo)}">${m.tipo}</span></td>
@@ -1635,13 +1608,18 @@ function pedidoBeneficio(item){return pedidoIngreso(item)-pedidoCoste(item);}
 function renderCatalogo(){
   const rawFiltro=document.getElementById('filtro-estado').value;
   const filtro=['activos','vendidos','cancelados'].includes(rawFiltro)?rawFiltro:normalizeEstado(rawFiltro);
+  const search=(document.getElementById('cat-search')?.value||'').toLowerCase().trim();
   const items=D.catalogo.filter(c=>{
     const e=normalizeEstado(c.estado);
     if(!rawFiltro)return true;
     if(filtro==='activos')return !['Cobrado','Cancelado'].includes(e);
     if(filtro==='vendidos')return e==='Cobrado';
     if(filtro==='cancelados')return e==='Cancelado';
-    return e===filtro;
+    if(e!==filtro)return false;
+    return true;
+  }).filter(c=>{
+    if(!search)return true;
+    return `${c.nombre||''} ${c.cliente||''} ${c.contacto||''} ${c.materiales||''}`.toLowerCase().includes(search);
   });
   const tbody=document.getElementById('cat-table');
   if(!items.length){tbody.innerHTML='<tr><td colspan="10"><div class="empty"><p>No hay productos. Usa la Calculadora para añadir.</p></div></td></tr>';return;}
@@ -1652,7 +1630,7 @@ function renderCatalogo(){
     <td class="td-mono">${fmt(c.coste)}</td>
     <td class="td-mono">${fmt(c.precioCalc)}</td>
     <td><input type="number" value="${c.precioAcordado||''}" placeholder="0.00" step="0.01" style="width:85px;padding:5px 7px;font-size:12px;font-family:var(--mono)" onchange="setCF(${c.id},'precioAcordado',parseFloat(this.value)||'')"></td>
-    <td><div style="margin-bottom:4px">${estadoLabel(c.estado)}</div><select style="font-size:12px;padding:5px 7px" onchange="setEstado(${c.id},this.value)">${ESTADOS.map(e=>`<option${normalizeEstado(c.estado)===e?' selected':''}>${e}</option>`).join('')}</select></td>
+    <td><select style="font-size:12px;padding:5px 7px;border-left:3px solid var(--accent)" onchange="setEstado(${c.id},this.value)">${ESTADOS.map(e=>`<option${normalizeEstado(c.estado)===e?' selected':''}>${e}</option>`).join('')}</select></td>
     <td><input type="date" value="${displayDateToInput(c.entrega)}" style="width:128px;padding:5px 7px;font-size:12px" onchange="setCF(${c.id},'entrega',inputDateToDisplay(this.value))"><div class="order-meta">creado ${c.fecha}</div></td>
     <td><input type="text" value="${c.notasInternas||c.notas||''}" placeholder="notas internas..." style="width:130px;padding:5px 7px;font-size:12px" onchange="setCF(${c.id},'notasInternas',this.value)"></td>
     <td style="white-space:nowrap">
@@ -1942,6 +1920,7 @@ function setFechaCobro(id,fecha){
 // ══════════════════════════════════════════════════════
 function renderPedidos(){
   const cols=ESTADOS;
+  const search=(document.getElementById('orders-search')?.value||'').toLowerCase().trim();
   const activeStates=['Aceptado','Diseño','Preparando','Imprimiendo','Post'];
   const readyStates=['Listo','Entregado'];
   const open=D.catalogo.filter(c=>!['Cobrado','Cancelado'].includes(normalizeEstado(c.estado)));
@@ -1963,7 +1942,7 @@ function renderPedidos(){
   }).join('');
 
   const tbody=document.getElementById('orders-table');
-  const rows=open.slice().reverse();
+  const rows=open.filter(c=>!search||`${c.nombre||''} ${c.cliente||''} ${c.contacto||''} ${c.materiales||''}`.toLowerCase().includes(search)).slice().reverse();
   if(!rows.length){
     tbody.innerHTML='<tr><td colspan="7"><div class="empty"><p>No hay pedidos abiertos.</p></div></td></tr>';
   } else {
@@ -1980,7 +1959,7 @@ function renderPedidos(){
         <input type="number" value="${c.precioAcordado||''}" placeholder="${parseFloat(c.precioCalc||0).toFixed(2)}" step="0.01" style="width:92px;padding:5px 7px;font-size:12px;font-family:var(--mono)" onchange="setCF(${c.id},'precioAcordado',parseFloat(this.value)||'')">
         <div class="order-meta">calc. ${fmt(c.precioCalc)}</div>
       </td>
-      <td><div style="margin-bottom:4px">${estadoLabel(c.estado)}</div><select style="font-size:12px;padding:5px 7px;min-width:140px" onchange="setEstado(${c.id},this.value)">${ESTADOS.map(e=>`<option${normalizeEstado(c.estado)===e?' selected':''}>${e}</option>`).join('')}</select></td>
+      <td><select style="font-size:12px;padding:5px 7px;min-width:140px;border-left:3px solid var(--accent)" onchange="setEstado(${c.id},this.value)">${ESTADOS.map(e=>`<option${normalizeEstado(c.estado)===e?' selected':''}>${e}</option>`).join('')}</select></td>
       <td><input type="date" value="${displayDateToInput(c.entrega)}" style="width:128px;padding:5px 7px;font-size:12px" onchange="setCF(${c.id},'entrega',inputDateToDisplay(this.value))"><div class="order-meta">creado ${c.fecha||'--'}</div></td>
       <td><input type="text" value="${c.notasInternas||c.notas||''}" placeholder="notas internas..." style="width:130px;padding:5px 7px;font-size:12px" onchange="setCF(${c.id},'notasInternas',this.value)"></td>
       <td style="white-space:nowrap">
