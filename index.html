@@ -49,18 +49,37 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:14
 .page.active{display:block;}
 .page-title{font-family:var(--display);font-size:22px;font-weight:900;letter-spacing:-0.5px;margin-bottom:24px;color:var(--text);}
 .page-title span{color:var(--accent2);}
+.top-tools{display:flex;gap:10px;align-items:flex-start;margin-bottom:16px;flex-wrap:wrap;}
+.global-search{position:relative;max-width:360px;flex:1;min-width:240px;}
+.global-search input{padding-left:34px;}
+.global-search:before{content:"⌕";position:absolute;left:12px;top:9px;color:var(--text3);z-index:1;font-family:var(--mono);}
+.search-results{position:absolute;left:0;right:0;top:calc(100% + 6px);background:var(--bg2);border:1px solid var(--border2);border-radius:8px;box-shadow:0 16px 40px rgba(0,0,0,.35);z-index:900;display:none;max-height:280px;overflow:auto;}
+.search-results.show{display:block;}
+.search-hit{padding:10px 12px;border-bottom:1px solid var(--border);cursor:pointer;}
+.search-hit:hover{background:var(--bg3);}
+.search-hit-title{font-size:13px;font-weight:700;color:var(--text);}
+.search-hit-meta{font-size:11px;color:var(--text3);margin-top:2px;}
+.state-chip{display:inline-flex;align-items:center;gap:5px;}
+.state-dot{width:7px;height:7px;border-radius:50%;background:var(--text3);}
+.state-dot.presupuesto{background:#60a5fa}.state-dot.aceptado{background:var(--accent)}.state-dot.diseno{background:var(--amber)}.state-dot.preparando{background:#9ca3af}.state-dot.imprimiendo{background:#f97316}.state-dot.post{background:#14b8a6}.state-dot.listo{background:#22c55e}.state-dot.entregado{background:#16a34a}.state-dot.cobrado{background:#00ff66}.state-dot.cancelado{background:var(--red);}
 .card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--card-r);padding:20px;margin-bottom:16px;box-shadow:var(--shadow);}
 .card-title{font-family:var(--display);font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--text3);margin-bottom:14px;}
 .grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
 .grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;}
 .grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;}
 label{display:block;font-size:12px;color:var(--text2);margin-bottom:4px;font-weight:500;}
-input[type=text],input[type=number],input[type=email],select,textarea{
+input[type=text],input[type=number],input[type=email],input[type=date],select,textarea{
   width:100%;background:var(--bg3);border:1px solid var(--border);color:var(--text);
   border-radius:8px;padding:8px 12px;font-size:13px;font-family:var(--sans);
   transition:border 0.15s;outline:none;
 }
 input:focus,select:focus,textarea:focus{border-color:var(--accent);}
+input[type=date]{color-scheme:dark;min-width:128px;}
+input[type=date]::-webkit-calendar-picker-indicator{filter:invert(1);opacity:.75;cursor:pointer;}
+input[type=date]::-webkit-datetime-edit{color:var(--text);}
+input[type=date]::-webkit-datetime-edit-fields-wrapper{padding:0;}
+html[data-theme="light"] input[type=date]{color-scheme:light;}
+html[data-theme="light"] input[type=date]::-webkit-calendar-picker-indicator{filter:none;opacity:.7;}
 select{cursor:pointer;}
 select option{background:var(--bg3);color:var(--text);}
 textarea{resize:vertical;min-height:60px;}
@@ -202,7 +221,7 @@ tr:hover td{background:var(--bg3);}
   .card,.stat{border-radius:10px;padding:14px;margin-bottom:12px;}
   .grid2,.grid3,.grid4,.form-row.cols2,.form-row.cols3,.form-row.cols4,.orders-summary,.orders-layout{grid-template-columns:1fr!important;}
   .form-row{gap:8px;margin-bottom:8px;}
-  input[type=text],input[type=number],input[type=email],select,textarea{font-size:16px;padding:10px 12px;min-height:42px;}
+  input[type=text],input[type=number],input[type=email],input[type=date],select,textarea{font-size:16px;padding:10px 12px;min-height:42px;}
   .btn{min-height:42px;padding:10px 14px;}
   .section-header{align-items:flex-start;gap:10px;flex-direction:column;}
   .orders-pipeline{grid-template-columns:repeat(9,104px);overflow-x:auto;margin-left:-2px;margin-right:-2px;}
@@ -267,6 +286,12 @@ tr:hover td{background:var(--bg3);}
 
 <!-- MAIN -->
 <main class="main">
+<div class="top-tools">
+  <div class="global-search">
+    <input type="text" id="global-search" placeholder="Buscar producto, cliente o material..." oninput="renderGlobalSearch()" onfocus="renderGlobalSearch()">
+    <div class="search-results" id="global-results"></div>
+  </div>
+</div>
 
 <!-- ══ DASHBOARD ══ -->
 <div id="page-dashboard" class="page active">
@@ -416,9 +441,10 @@ tr:hover td{background:var(--bg3);}
   <div class="page-title">Catálogo <span>/ productos</span></div>
   <div style="margin-bottom:14px;display:flex;gap:8px;flex-wrap:wrap">
     <select id="filtro-estado" onchange="renderCatalogo()" style="width:200px">
+      <option value="activos" selected>Activos</option>
       <option value="">Todos los estados</option>
       <option>Presupuesto</option><option>Aceptado</option><option>Diseño</option>
-      <option value="activos">Activos</option><option value="vendidos">Vendidos</option><option value="cancelados">Cancelados</option>
+      <option value="vendidos">Vendidos</option><option value="cancelados">Cancelados</option>
       <option>Preparando</option><option>Imprimiendo</option><option>Post</option>
       <option>Listo</option><option>Entregado</option><option>Cobrado</option><option>Cancelado</option>
     </select>
@@ -478,6 +504,11 @@ tr:hover td{background:var(--bg3);}
     <div class="stat"><div class="stat-label">Coste estimado</div><div class="stat-value amber" id="v-coste">0 €</div><div class="stat-sub">materiales y luz</div></div>
     <div class="stat"><div class="stat-label">Beneficio</div><div class="stat-value accent" id="v-beneficio">0 €</div><div class="stat-sub">ingresos - coste</div></div>
   </div>
+  <div class="grid3" style="margin-bottom:18px">
+    <div class="stat"><div class="stat-label">Ventas este mes</div><div class="stat-value green" id="v-mes-total">0</div><div class="stat-sub">pedidos cobrados</div></div>
+    <div class="stat"><div class="stat-label">Beneficio este mes</div><div class="stat-value accent" id="v-mes-beneficio">0 €</div><div class="stat-sub">margen mensual</div></div>
+    <div class="stat"><div class="stat-label">Ticket medio</div><div class="stat-value amber" id="v-ticket">0 €</div><div class="stat-sub">ingreso medio</div></div>
+  </div>
   <div style="margin-bottom:14px;display:flex;gap:8px;flex-wrap:wrap">
     <input type="text" id="v-filter-text" placeholder="Buscar venta..." oninput="renderVentas()" style="max-width:260px">
     <select id="v-filter-month" onchange="renderVentas()" style="width:180px">
@@ -486,6 +517,8 @@ tr:hover td{background:var(--bg3);}
       <option value="05">Mayo</option><option value="06">Junio</option><option value="07">Julio</option><option value="08">Agosto</option>
       <option value="09">Septiembre</option><option value="10">Octubre</option><option value="11">Noviembre</option><option value="12">Diciembre</option>
     </select>
+    <button class="btn btn-ghost" onclick="exportVentasCSV()">Exportar ventas CSV</button>
+    <button class="btn btn-ghost" onclick="exportGastosCSV()">Exportar gastos CSV</button>
   </div>
   <div class="card">
     <div class="table-wrap">
@@ -998,6 +1031,33 @@ function goTo(el){
   const renders={dashboard:renderDashboard,calc:initCalc,filamentos:renderFilamentos,consumibles:renderConsumibles,materiales:renderMaterialesExtra,catalogo:renderCatalogo,pedidos:renderPedidos,ventas:renderVentas,gastos:renderGastos,balance:renderBalance,ajustes:loadSettings};
   if(renders[page])renders[page]();
 }
+function navigateTo(page){
+  const el=document.querySelector(`.nav-item[data-page="${page}"]`);
+  if(el)goTo(el);
+}
+function estadoClass(e){
+  return normalizeEstado(e).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+}
+function estadoLabel(e){
+  const st=normalizeEstado(e);
+  return `<span class="state-chip"><span class="state-dot ${estadoClass(st)}"></span>${st}</span>`;
+}
+function renderGlobalSearch(){
+  const q=(document.getElementById('global-search')?.value||'').toLowerCase().trim();
+  const box=document.getElementById('global-results');
+  if(!box)return;
+  if(q.length<2){box.classList.remove('show');box.innerHTML='';return;}
+  const hits=[];
+  D.catalogo.forEach(c=>{
+    const hay=`${c.nombre||''} ${c.cliente||''} ${c.contacto||''} ${c.materiales||''} ${c.estado||''}`.toLowerCase();
+    if(hay.includes(q))hits.push({title:c.nombre,meta:`${c.cliente||'Sin cliente'} · ${normalizeEstado(c.estado)}`,page:normalizeEstado(c.estado)==='Cobrado'?'ventas':'catalogo'});
+  });
+  D.filamentos.forEach(f=>{if(`${f.nombre} ${f.material} ${f.color} ${f.marca}`.toLowerCase().includes(q))hits.push({title:f.nombre,meta:`Filamento · ${f.stock||0}g`,page:'filamentos'});});
+  D.consumibles.forEach(c=>{if(`${c.nombre} ${c.desc||''} ${c.proveedor||''}`.toLowerCase().includes(q))hits.push({title:c.nombre,meta:`Consumible · ${c.stock||0} uds`,page:'consumibles'});});
+  D.materiales.forEach(m=>{if(`${m.nombre} ${m.tipo||''} ${m.marca||''} ${m.proveedor||''}`.toLowerCase().includes(q))hits.push({title:m.nombre,meta:`Material · ${m.tipo||'Otro'}`,page:'materiales'});});
+  box.innerHTML=hits.slice(0,8).map(h=>`<div class="search-hit" onclick="navigateTo('${h.page}');document.getElementById('global-search').value='';document.getElementById('global-results').classList.remove('show')"><div class="search-hit-title">${h.title}</div><div class="search-hit-meta">${h.meta}</div></div>`).join('')||'<div class="search-hit"><div class="search-hit-meta">Sin resultados</div></div>';
+  box.classList.add('show');
+}
 
 // ══════════════════════════════════════════════════════
 // THEME
@@ -1063,8 +1123,8 @@ function renderDashboard(){
     ...conBajos.map(c=>({tipo:'Consumible',nombre:c.nombre,restante:`${c.stock||0} uds`,urgente:true}))
   ];
   const orderAlerts=[
-    ...listos.map(c=>({txt:`Listo para entregar: ${c.nombre}`,sub:c.cliente||'Sin cliente'})),
-    ...entregados.map(c=>({txt:`Entregado pendiente de cobrar: ${c.nombre}`,sub:fmt(parseFloat(c.precioAcordado)||parseFloat(c.precioCalc)||0)}))
+    ...listos.map(c=>({txt:`Listo para entregar: ${c.nombre}`,sub:c.cliente||'Sin cliente',page:'pedidos'})),
+    ...entregados.map(c=>({txt:`Entregado pendiente de cobrar: ${c.nombre}`,sub:fmt(pedidoIngreso(c)),page:'pedidos'}))
   ];
   daEl.innerHTML=(stockAlerts.length||orderAlerts.length)?[
     ...stockAlerts.map(a=>`<div class="alert-item">
@@ -1080,6 +1140,7 @@ function renderDashboard(){
         <span style="font-size:13px;color:var(--text)">${a.txt}</span>
         <div style="font-size:11px;color:var(--text3);font-family:var(--mono)">${a.sub}</div>
       </div>
+      <button class="btn btn-ghost" style="padding:5px 9px;font-size:11px" onclick="navigateTo('${a.page}')">Ir</button>
     </div>`)
   ].join('')
   :'<div class="empty"><p>Todo el stock está bien</p></div>';
@@ -1591,7 +1652,7 @@ function renderCatalogo(){
     <td class="td-mono">${fmt(c.coste)}</td>
     <td class="td-mono">${fmt(c.precioCalc)}</td>
     <td><input type="number" value="${c.precioAcordado||''}" placeholder="0.00" step="0.01" style="width:85px;padding:5px 7px;font-size:12px;font-family:var(--mono)" onchange="setCF(${c.id},'precioAcordado',parseFloat(this.value)||'')"></td>
-    <td><select style="font-size:12px;padding:5px 7px" onchange="setEstado(${c.id},this.value)">${ESTADOS.map(e=>`<option${normalizeEstado(c.estado)===e?' selected':''}>${e}</option>`).join('')}</select></td>
+    <td><div style="margin-bottom:4px">${estadoLabel(c.estado)}</div><select style="font-size:12px;padding:5px 7px" onchange="setEstado(${c.id},this.value)">${ESTADOS.map(e=>`<option${normalizeEstado(c.estado)===e?' selected':''}>${e}</option>`).join('')}</select></td>
     <td><input type="date" value="${displayDateToInput(c.entrega)}" style="width:128px;padding:5px 7px;font-size:12px" onchange="setCF(${c.id},'entrega',inputDateToDisplay(this.value))"><div class="order-meta">creado ${c.fecha}</div></td>
     <td><input type="text" value="${c.notasInternas||c.notas||''}" placeholder="notas internas..." style="width:130px;padding:5px 7px;font-size:12px" onchange="setCF(${c.id},'notasInternas',this.value)"></td>
     <td style="white-space:nowrap">
@@ -1814,6 +1875,17 @@ function renderVentas(){
   const bEl=document.getElementById('v-beneficio');
   bEl.textContent=fmt(ingresos-coste);
   bEl.className='stat-value '+(ingresos-coste>=0?'green':'red');
+  const now=new Date();const mes=String(now.getMonth()+1).padStart(2,'0');const year=String(now.getFullYear());
+  const ventasMes=ventasItems().filter(v=>{
+    const fecha=v.fechaCobro||D.cobros.find(c=>String(c.itemId)===String(v.id))?.fecha||'';
+    const p=fecha.split('/');
+    return p[1]===mes&&p[2]===year;
+  });
+  const ingMes=ventasMes.reduce((s,v)=>s+pedidoIngreso(v),0);
+  const benMes=ventasMes.reduce((s,v)=>s+pedidoBeneficio(v),0);
+  document.getElementById('v-mes-total').textContent=ventasMes.length;
+  const bm=document.getElementById('v-mes-beneficio');bm.textContent=fmt(benMes);bm.className='stat-value '+(benMes>=0?'green':'red');
+  document.getElementById('v-ticket').textContent=fmt(ventasMes.length?ingMes/ventasMes.length:0);
   const tbody=document.getElementById('ventas-table');
   if(!ventas.length){tbody.innerHTML='<tr><td colspan="8"><div class="empty"><p>No hay ventas con esos filtros.</p></div></td></tr>';return;}
   tbody.innerHTML=ventas.map(v=>{
@@ -1829,10 +1901,26 @@ function renderVentas(){
       <td class="td-mono" style="color:var(--green)">${fmt(ingreso)}</td>
       <td class="td-mono" style="color:var(--amber)">${fmt(costePedido)}</td>
       <td class="td-mono" style="color:${beneficio>=0?'var(--green)':'var(--red)'}">${fmt(beneficio)}</td>
-      <td><span class="badge ${estadoBadge(v.estado)}">${v.estado}</span></td>
+      <td><span class="badge ${estadoBadge(v.estado)}">${estadoLabel(v.estado)}</span></td>
       <td style="white-space:nowrap"><button class="btn btn-pdf" onclick="openDocModal(${v.id})">DOC</button><button class="btn btn-ghost" style="padding:5px 9px;font-size:11px;margin-left:4px" onclick="duplicarPedido(${v.id})">Duplicar</button></td>
     </tr>`;
   }).join('');
+}
+function csvEscape(v){return `"${String(v??'').replace(/"/g,'""')}"`;}
+function downloadCSV(name,headers,rows){
+  const csv=[headers.map(csvEscape).join(','),...rows.map(r=>r.map(csvEscape).join(','))].join('\n');
+  const blob=new Blob([csv],{type:'text/csv;charset=utf-8'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');a.href=url;a.download=name;document.body.appendChild(a);a.click();document.body.removeChild(a);
+  setTimeout(()=>URL.revokeObjectURL(url),1000);
+}
+function exportVentasCSV(){
+  const rows=ventasItems().map(v=>[v.fechaCobro||'',v.nombre||'',v.cliente||'',pedidoIngreso(v),pedidoCoste(v),pedidoBeneficio(v),v.estado||'']);
+  downloadCSV('ventas_kurin_lab.csv',['Fecha cobro','Producto','Cliente','Ingreso','Coste','Beneficio','Estado'],rows);
+}
+function exportGastosCSV(){
+  const rows=D.gastos.map(g=>[g.fecha||'',g.cat||'',g.desc||'',g.prov||'',g.importe||0,g.origen||'Manual']);
+  downloadCSV('gastos_kurin_lab.csv',['Fecha','Categoria','Descripcion','Proveedor','Importe','Origen'],rows);
 }
 function setFechaCobro(id,fecha){
   const item=D.catalogo.find(c=>c.id===id);if(!item)return;
@@ -1869,7 +1957,7 @@ function renderPedidos(){
   document.getElementById('orders-pipeline').innerHTML=cols.map(estado=>{
     const n=D.catalogo.filter(c=>normalizeEstado(c.estado)===estado).length;
     return `<div class="orders-step ${n?'active':''}">
-      <div class="orders-step-name">${estado}</div>
+      <div class="orders-step-name">${estadoLabel(estado)}</div>
       <div class="orders-step-count">${n}</div>
     </div>`;
   }).join('');
@@ -1892,7 +1980,7 @@ function renderPedidos(){
         <input type="number" value="${c.precioAcordado||''}" placeholder="${parseFloat(c.precioCalc||0).toFixed(2)}" step="0.01" style="width:92px;padding:5px 7px;font-size:12px;font-family:var(--mono)" onchange="setCF(${c.id},'precioAcordado',parseFloat(this.value)||'')">
         <div class="order-meta">calc. ${fmt(c.precioCalc)}</div>
       </td>
-      <td><select style="font-size:12px;padding:5px 7px;min-width:140px" onchange="setEstado(${c.id},this.value)">${ESTADOS.map(e=>`<option${normalizeEstado(c.estado)===e?' selected':''}>${e}</option>`).join('')}</select></td>
+      <td><div style="margin-bottom:4px">${estadoLabel(c.estado)}</div><select style="font-size:12px;padding:5px 7px;min-width:140px" onchange="setEstado(${c.id},this.value)">${ESTADOS.map(e=>`<option${normalizeEstado(c.estado)===e?' selected':''}>${e}</option>`).join('')}</select></td>
       <td><input type="date" value="${displayDateToInput(c.entrega)}" style="width:128px;padding:5px 7px;font-size:12px" onchange="setCF(${c.id},'entrega',inputDateToDisplay(this.value))"><div class="order-meta">creado ${c.fecha||'--'}</div></td>
       <td><input type="text" value="${c.notasInternas||c.notas||''}" placeholder="notas internas..." style="width:130px;padding:5px 7px;font-size:12px" onchange="setCF(${c.id},'notasInternas',this.value)"></td>
       <td style="white-space:nowrap">
@@ -2014,7 +2102,7 @@ function renderBalance(){
     </div>`;}).join('');
   document.getElementById('b-cobros').innerHTML=D.cobros.slice().reverse().slice(0,10).map(c=>{
     const cobroId=c.id||c._sbid;
-    return`<tr><td><input type="date" value="${displayDateToInput(c.fecha)}" style="width:130px;padding:5px 7px;font-size:12px" onchange="setCobroFecha('${cobroId}',inputDateToDisplay(this.value))"></td><td class="td-main">${c.nombre}</td><td class="td-mono" style="color:var(--green)">${fmt(c.importe)}</td><td><button class="btn btn-danger" style="padding:5px 10px;font-size:11px" onclick="delCobro('${cobroId}')">Borrar</button></td></tr>`;
+    return`<tr><td><input type="date" value="${displayDateToInput(c.fecha)}" style="width:130px;padding:5px 7px;font-size:12px" onchange="setCobroFecha('${cobroId}',inputDateToDisplay(this.value))"></td><td class="td-main">${c.nombre}</td><td class="td-mono" style="color:var(--green)">${fmt(c.importe)}</td><td><button class="btn btn-ghost" style="padding:5px 10px;font-size:11px" onclick="navigateTo('ventas')">Ver venta</button> <button class="btn btn-pdf" onclick="generarPDF(${c.itemId},'Recibo')">Recibo</button> <button class="btn btn-danger" style="padding:5px 10px;font-size:11px" onclick="delCobro('${cobroId}')">Borrar</button></td></tr>`;
   }).join('')||'<tr><td colspan="4"><div class="empty"><p>Sin cobros registrados.</p></div></td></tr>';
   const meses=['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
   const año=new Date().getFullYear();
