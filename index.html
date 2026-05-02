@@ -1272,7 +1272,7 @@ function addFilamento(){
     </div>
     <div class="form-row cols2">
       <div><label>Color</label><input type="text" id="mf-color" placeholder="Negro, Rojo..."></div>
-      <div><label>Marca</label><select id="mf-marca"><option>Bambu Lab</option><option>eSUN</option><option>Polymaker</option><option>Sunlu</option><option>Prusament</option><option>Creality</option><option>Otra</option></select></div>
+      <div><label>Marca</label><select id="mf-marca"><option>Bambu Lab</option><option>ELEGOO</option><option>eSUN</option><option>Polymaker</option><option>Sunlu</option><option>Prusament</option><option>Creality</option><option>Otra</option></select></div>
     </div>
     <div class="form-row cols2">
       <div><label>Proveedor</label><input type="text" id="mf-prov" placeholder="Amazon..."></div>
@@ -1315,7 +1315,7 @@ function editFilamento(id){
     </div>
     <div class="form-row cols2">
       <div><label>Color</label><input type="text" id="mf-color" value="${f.color}"></div>
-      <div><label>Marca</label><select id="mf-marca">${['Bambu Lab','eSUN','Polymaker','Sunlu','Prusament','Creality','Otra'].map(m=>`<option${m===f.marca?' selected':''}>${m}</option>`).join('')}</select></div>
+      <div><label>Marca</label><select id="mf-marca">${['Bambu Lab','ELEGOO','eSUN','Polymaker','Sunlu','Prusament','Creality','Otra'].map(m=>`<option${m===f.marca?' selected':''}>${m}</option>`).join('')}</select></div>
     </div>
     <div class="form-row cols2">
       <div><label>Proveedor</label><input type="text" id="mf-prov" value="${f.proveedor||''}"></div>
