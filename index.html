@@ -250,6 +250,7 @@ tr:hover td{background:var(--bg3);}
     <div class="nav-section">Materiales</div>
     <div class="nav-item" data-page="filamentos" onclick="goTo(this)"><span class="nav-icon">🎨</span><span>Filamentos</span></div>
     <div class="nav-item" data-page="consumibles" onclick="goTo(this)"><span class="nav-icon">🔩</span><span>Consumibles</span></div>
+    <div class="nav-item" data-page="materiales" onclick="goTo(this)"><span class="nav-icon">🧰</span><span>Materiales</span></div>
     <div class="nav-section">Negocio</div>
     <div class="nav-item" data-page="catalogo" onclick="goTo(this)"><span class="nav-icon">📋</span><span>Catálogo</span></div>
     <div class="nav-item" data-page="pedidos" onclick="goTo(this)"><span class="nav-icon">📦</span><span>Pedidos</span></div>
@@ -391,6 +392,23 @@ tr:hover td{background:var(--bg3);}
   </div>
 </div>
 
+<!-- ══ MATERIALES EXTRA ══ -->
+<div id="page-materiales" class="page">
+  <div class="page-title">Materiales <span>/ herramientas y compras</span></div>
+  <div class="card">
+    <div class="section-header">
+      <h2>Herramientas, accesorios y extras</h2>
+      <button class="btn btn-primary" onclick="addMaterialExtra()">+ Añadir</button>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Nombre</th><th>Tipo</th><th>Marca</th><th>Compra</th><th>Cantidad</th><th>Precio</th><th>Unidad</th><th>Link</th><th></th></tr></thead>
+        <tbody id="mat-table"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
 <!-- ══ CATÁLOGO ══ -->
 <div id="page-catalogo" class="page">
   <div class="page-title">Catálogo <span>/ productos</span></div>
@@ -451,7 +469,19 @@ tr:hover td{background:var(--bg3);}
 <!-- ══ GASTOS ══ -->
 <div id="page-gastos" class="page">
   <div class="page-title">Gastos <span>/ registro</span></div>
-  <div class="card" style="margin-bottom:18px">
+  <div style="margin-bottom:14px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+    <button class="btn btn-primary" onclick="toggleGastoManual()">+ Gasto manual</button>
+    <select id="g-filter-cat" onchange="renderGastos()" style="width:180px">
+      <option value="">Todas las categorías</option>
+      <option>Filamento</option><option>Accesorio</option><option>Impresora</option><option>Herramienta</option><option>Suscripcion</option><option>Envio</option><option>Otro</option>
+    </select>
+    <select id="g-filter-origin" onchange="renderGastos()" style="width:170px">
+      <option value="">Todos los orígenes</option>
+      <option>Manual</option><option>Filamentos</option><option>Consumibles</option><option>Materiales</option>
+    </select>
+    <input type="text" id="g-filter-text" placeholder="Buscar gasto..." oninput="renderGastos()" style="max-width:260px">
+  </div>
+  <div class="card" id="gasto-manual-card" style="margin-bottom:18px;display:none">
     <div class="card-title">Añadir gasto manual</div>
     <div class="form-row cols4">
       <div><label>Fecha</label><input type="text" id="g-fecha" placeholder="dd/mm/aaaa"></div>
@@ -634,12 +664,15 @@ async function loadAllData() {
     if(multRow) D.multiplicadores = multRow.valor;
     const stockMovsRow = confs.find(c => c.clave === 'stockMovs');
     if(stockMovsRow) D.stockMovs = stockMovsRow.valor||[];
+    const materialesRow = confs.find(c => c.clave === 'materiales');
+    if(materialesRow) D.materiales = materialesRow.valor||[];
     
     // Sync nextIds
     D.nextId.fil = D.filamentos.length ? Math.max(...D.filamentos.map(f=>f.id||0)) + 1 : 1;
     D.nextId.con = D.consumibles.length ? Math.max(...D.consumibles.map(c=>c.id||0)) + 1 : 1;
     D.nextId.cat = D.catalogo.length ? Math.max(...D.catalogo.map(c=>c.id||0)) + 1 : 1;
     D.nextId.gasto = D.gastos.length ? Math.max(...D.gastos.map(g=>g.id||0)) + 1 : 1;
+    D.nextId.mat = D.materiales.length ? Math.max(...D.materiales.map(m=>m.id||0)) + 1 : 1;
     
     console.log('Data loaded from Supabase');
     return true;
@@ -710,15 +743,16 @@ const DEF = {
     {id:1,nombre:"Llavero metalico",desc:"Llavero anilla dorada",uds:30,precio:2.00,stock:30,proveedor:"AliExpress",link:""},
     {id:2,nombre:"Iman 10mm",desc:"Iman neodimio 10x2mm",uds:100,precio:5.99,stock:100,proveedor:"AliExpress",link:""},
   ],
-  catalogo:[],gastos:[],cobros:[],actividad:[],stockMovs:[],
+  catalogo:[],gastos:[],cobros:[],actividad:[],stockMovs:[],materiales:[],
   multiplicadores:[{mult:2,label:"x2 — Básico"},{mult:3,label:"x3 — Recomendado"},{mult:4,label:"x4 — Feria"}],
   settings:{nombre:"Kurin Lab",sub:"CREATE · TEST · EVOLVE",watts:65,kwh:0.18,stockAlert:150,logo:""},
-  nextId:{fil:6,con:3,cat:1,gasto:1}
+  nextId:{fil:6,con:3,cat:1,gasto:1,mat:1}
 };
 
 let D = JSON.parse(localStorage.getItem('print3d_v2')||'null') || JSON.parse(JSON.stringify(DEF));
 if(!D.actividad) D.actividad=[];
 if(!D.stockMovs) D.stockMovs=[];
+if(!D.materiales) D.materiales=[];
 if(!D.settings) D.settings=JSON.parse(JSON.stringify(DEF.settings));
 if(!D.settings.logo) D.settings.logo="";
 D.catalogo.forEach(c=>{c.estado=normalizeEstado(c.estado);});
@@ -755,7 +789,7 @@ function queueConfigSave(...keys){
 }
 function flushConfigSave(){
   if(!SUPABASE_KEY||!pendingConfigKeys.size)return;
-  const values={settings:D.settings,actividad:D.actividad,multiplicadores:D.multiplicadores,stockMovs:D.stockMovs};
+  const values={settings:D.settings,actividad:D.actividad,multiplicadores:D.multiplicadores,stockMovs:D.stockMovs,materiales:D.materiales};
   const keys=[...pendingConfigKeys];pendingConfigKeys.clear();
   keys.forEach(k=>saveConfig(k,values[k]));
 }
@@ -825,11 +859,16 @@ function actividadExiste(a){
       const desc=msg.replace('Gasto añadido: ','').split(' — ')[0].trim();
       return D.gastos.some(x=>x.desc===desc);
     }
+    if(msg.startsWith('Material añadido: ')){
+      const nombre=msg.replace('Material añadido: ','').trim();
+      return D.materiales.some(x=>x.nombre===nombre);
+    }
     return true;
   }
   if(a.refType==='catalogo')return D.catalogo.some(x=>x.id===a.refId);
   if(a.refType==='filamento')return D.filamentos.some(x=>x.id===a.refId);
   if(a.refType==='consumible')return D.consumibles.some(x=>x.id===a.refId);
+  if(a.refType==='material')return D.materiales.some(x=>x.id===a.refId);
   if(a.refType==='gasto')return D.gastos.some(x=>x.id===a.refId);
   if(a.refType==='cobro')return D.cobros.some(x=>x.id===a.refId||x._sbid===a.refId);
   return true;
@@ -873,6 +912,11 @@ function limpiarGastosMaterialesHuerfanos(){
       const desc=String(g.desc||'').trim();
       return desc&&!D.consumibles.some(c=>desc.startsWith((c.nombre||'').trim()));
     }
+    if(g.origen==='Materiales'){
+      if(g.itemId)return !D.materiales.some(m=>String(m.id)===String(g.itemId));
+      const desc=String(g.desc||'').trim();
+      return desc&&!D.materiales.some(m=>desc.startsWith((m.nombre||'').trim()));
+    }
     return false;
   });
   borrar.forEach(g=>{
@@ -906,7 +950,7 @@ function goTo(el){
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
   document.getElementById('page-'+page).classList.add('active');
   el.classList.add('active');
-  const renders={dashboard:renderDashboard,calc:initCalc,filamentos:renderFilamentos,consumibles:renderConsumibles,catalogo:renderCatalogo,pedidos:renderPedidos,gastos:renderGastos,balance:renderBalance,ajustes:loadSettings};
+  const renders={dashboard:renderDashboard,calc:initCalc,filamentos:renderFilamentos,consumibles:renderConsumibles,materiales:renderMaterialesExtra,catalogo:renderCatalogo,pedidos:renderPedidos,gastos:renderGastos,balance:renderBalance,ajustes:loadSettings};
   if(renders[page])renders[page]();
 }
 
@@ -1397,6 +1441,84 @@ function editConsumible(id){
 function delConsumible(id){if(!confirm('¿Borrar? También se quitará del Balance el gasto vinculado a este consumible.'))return;const c=D.consumibles.find(x=>x.id===id);if(c&&c._sbid)deleteFromSupabase('consumibles',c._sbid);const n=borrarGastosVinculados('consumible',c);limpiarActividad('consumible',id,c?.nombre);D.consumibles=D.consumibles.filter(c=>c.id!==id);save();renderConsumibles();if(document.getElementById('page-balance')?.classList.contains('active'))renderBalance();notify('Consumible eliminado'+(n?' y gasto quitado del balance':''));}
 
 // ══════════════════════════════════════════════════════
+// MATERIALES EXTRA
+// ══════════════════════════════════════════════════════
+function renderMaterialesExtra(){
+  const tbody=document.getElementById('mat-table');
+  if(!D.materiales.length){tbody.innerHTML='<tr><td colspan="9"><div class="empty"><p>No hay herramientas ni materiales extra.</p></div></td></tr>';return;}
+  tbody.innerHTML=D.materiales.slice().reverse().map(m=>`
+    <tr>
+      <td class="td-main">${m.nombre}</td>
+      <td><span class="badge ${catBadge(m.tipo)}">${m.tipo}</span></td>
+      <td>${m.marca||'—'}</td>
+      <td style="color:var(--text3)">${m.proveedor||'—'}</td>
+      <td class="td-mono">${m.cantidad||1}</td>
+      <td class="td-mono" style="color:var(--red)">${fmt(m.precio)}</td>
+      <td class="td-mono" style="color:var(--accent2)">${fmt((parseFloat(m.precio)||0)/(parseFloat(m.cantidad)||1))}/ud</td>
+      <td>${m.link?`<a href="${m.link}" target="_blank" style="color:var(--accent2)">Abrir</a>`:'—'}</td>
+      <td style="white-space:nowrap"><button class="action-btn" onclick="editMaterialExtra(${m.id})">✎</button><button class="action-btn" onclick="delMaterialExtra(${m.id})">✕</button></td>
+    </tr>`).join('');
+}
+function materialExtraForm(m={}){
+  const id=m.id||'';
+  return `<div style="font-family:var(--display);font-size:17px;font-weight:800;margin-bottom:18px">${id?'Editar':'Nuevo'} material</div>
+    <div class="form-row cols2">
+      <div><label>Nombre</label><input type="text" id="mx-nombre" value="${m.nombre||''}" placeholder="Espátula, boquillas, cinta..."></div>
+      <div><label>Tipo</label><select id="mx-tipo">${['Herramienta','Accesorio','Impresora','Envio','Otro'].map(t=>`<option${t===(m.tipo||'Herramienta')?' selected':''}>${t}</option>`).join('')}</select></div>
+    </div>
+    <div class="form-row cols2">
+      <div><label>Marca</label><input type="text" id="mx-marca" value="${m.marca||''}" placeholder="Bambu Lab, ELEGOO..."></div>
+      <div><label>Sitio de compra</label><input type="text" id="mx-prov" value="${m.proveedor||''}" placeholder="Amazon, AliExpress..."></div>
+    </div>
+    <div class="form-row cols3">
+      <div><label>Cantidad</label><input type="number" id="mx-cantidad" value="${m.cantidad||1}" min="1" step="1"></div>
+      <div><label>Precio total (€)</label><input type="number" id="mx-precio" value="${m.precio||0}" step="0.01"></div>
+      <div><label>Fecha</label><input type="text" id="mx-fecha" value="${m.fecha||today()}" placeholder="dd/mm/aaaa"></div>
+    </div>
+    <div class="form-row cols2">
+      <div><label>Link</label><input type="text" id="mx-link" value="${m.link||''}" placeholder="https://..."></div>
+      <div><label>Notas</label><input type="text" id="mx-notas" value="${m.notas||''}" placeholder="Medida, uso, repuesto..."></div>
+    </div>
+    <div style="display:flex;gap:8px;margin-top:10px"><button class="btn btn-primary" style="flex:1" onclick="saveMaterialExtra(${id||''})">Guardar</button><button class="btn btn-ghost" onclick="closeModal()">Cancelar</button></div>`;
+}
+function addMaterialExtra(){openModal(materialExtraForm());}
+function editMaterialExtra(id){const m=D.materiales.find(x=>x.id===id);if(m)openModal(materialExtraForm(m));}
+function gastoFromMaterial(m,gastoId){
+  return {id:gastoId||D.nextId.gasto++,fecha:m.fecha||today(),cat:m.tipo||'Herramienta',desc:m.nombre+(m.notas?' — '+m.notas:''),prov:m.proveedor||m.marca||'',importe:parseFloat(m.precio)||0,origen:'Materiales',itemId:m.id};
+}
+function saveMaterialExtra(id){
+  const m={id:id||D.nextId.mat++,nombre:document.getElementById('mx-nombre').value.trim(),tipo:document.getElementById('mx-tipo').value,marca:document.getElementById('mx-marca').value.trim(),proveedor:document.getElementById('mx-prov').value.trim(),cantidad:parseFloat(document.getElementById('mx-cantidad').value)||1,precio:parseFloat(document.getElementById('mx-precio').value)||0,fecha:document.getElementById('mx-fecha').value||today(),link:document.getElementById('mx-link').value.trim(),notas:document.getElementById('mx-notas').value.trim()};
+  if(!m.nombre){notify('El nombre es obligatorio','error');return;}
+  if(id){
+    const i=D.materiales.findIndex(x=>x.id===id);
+    const oldG=D.gastos.find(g=>g.origen==='Materiales'&&String(g.itemId)===String(id));
+    D.materiales[i]=m;
+    if(oldG){
+      const updated=gastoFromMaterial(m,oldG.id);updated._sbid=oldG._sbid;
+      Object.assign(oldG,updated);
+      if(oldG._sbid)saveToSupabase('gastos',oldG,oldG._sbid);
+    }
+  } else {
+    D.materiales.push(m);
+    const g=gastoFromMaterial(m);
+    D.gastos.push(g);
+    saveToSupabase('gastos',g);
+    addActividad('Material añadido: '+m.nombre,{tipo:'gasto',refType:'material',refId:m.id});
+  }
+  save();queueConfigSave('materiales','actividad');closeModal();renderMaterialesExtra();notify(id?'Material actualizado':'Material añadido y gasto registrado');
+}
+function delMaterialExtra(id){
+  if(!confirm('¿Borrar? También se quitará del Balance el gasto vinculado.'))return;
+  const m=D.materiales.find(x=>x.id===id);
+  const borrar=D.gastos.filter(g=>g.origen==='Materiales'&&String(g.itemId)===String(id));
+  borrar.forEach(g=>{if(g._sbid)deleteFromSupabase('gastos',g._sbid);limpiarActividad('gasto',g.id,g.desc);});
+  D.gastos=D.gastos.filter(g=>!borrar.includes(g));
+  limpiarActividad('material',id,m?.nombre);
+  D.materiales=D.materiales.filter(x=>x.id!==id);
+  save();queueConfigSave('materiales','actividad');renderMaterialesExtra();if(document.getElementById('page-balance')?.classList.contains('active'))renderBalance();notify('Material eliminado'+(borrar.length?' y gasto quitado del balance':''));
+}
+
+// ══════════════════════════════════════════════════════
 // CATÁLOGO
 // ══════════════════════════════════════════════════════
 const ESTADOS=['Presupuesto','Aceptado','Diseño','Preparando','Imprimiendo','Post','Listo','Entregado','Cobrado'];
@@ -1640,8 +1762,17 @@ function renderPedidos(){
 function renderGastos(){
   document.getElementById('g-fecha').value=today();
   const tbody=document.getElementById('gasto-table');
-  if(!D.gastos.length){tbody.innerHTML='<tr><td colspan="7"><div class="empty"><p>No hay gastos registrados.</p></div></td></tr>';return;}
-  tbody.innerHTML=D.gastos.slice().reverse().map(g=>`<tr>
+  const cat=document.getElementById('g-filter-cat')?.value||'';
+  const origen=document.getElementById('g-filter-origin')?.value||'';
+  const text=(document.getElementById('g-filter-text')?.value||'').toLowerCase().trim();
+  const gastos=D.gastos.filter(g=>{
+    if(cat&&g.cat!==cat)return false;
+    if(origen&&(g.origen||'Manual')!==origen)return false;
+    if(text&&!`${g.desc||''} ${g.prov||''} ${g.cat||''} ${g.origen||''}`.toLowerCase().includes(text))return false;
+    return true;
+  });
+  if(!gastos.length){tbody.innerHTML='<tr><td colspan="7"><div class="empty"><p>No hay gastos con esos filtros.</p></div></td></tr>';return;}
+  tbody.innerHTML=gastos.slice().reverse().map(g=>`<tr>
     <td class="td-mono" style="font-size:12px">${g.fecha}</td>
     <td><span class="badge ${catBadge(g.cat)}">${g.cat}</span></td>
     <td class="td-main">${g.desc}</td>
@@ -1650,6 +1781,12 @@ function renderGastos(){
     <td><span class="badge badge-gray" style="font-size:10px">${g.origen||'Manual'}</span></td>
     <td><button class="action-btn" onclick="delGasto(${g.id})">✕</button></td>
   </tr>`).join('');
+}
+function toggleGastoManual(){
+  const card=document.getElementById('gasto-manual-card');
+  if(!card)return;
+  card.style.display=card.style.display==='none'?'block':'none';
+  if(card.style.display==='block')document.getElementById('g-fecha').value=today();
 }
 function addGasto(){
   const g={id:D.nextId.gasto++,fecha:document.getElementById('g-fecha').value||today(),cat:document.getElementById('g-cat').value,desc:document.getElementById('g-desc').value.trim(),prov:document.getElementById('g-prov').value.trim(),importe:parseFloat(document.getElementById('g-importe').value)||0,origen:'Manual'};
