@@ -842,6 +842,49 @@ function limpiarActividad(refType,refId,nombre=''){
   });
   if(D.actividad.length!==before)queueConfigSave('actividad');
 }
+function borrarGastosVinculados(tipo,item){
+  if(!item)return 0;
+  const origen=tipo==='filamento'?'Filamentos':'Consumibles';
+  const cat=tipo==='filamento'?'Filamento':'Accesorio';
+  const nombre=(item.nombre||'').trim();
+  const before=D.gastos.length;
+  const borrar=D.gastos.filter(g=>{
+    if(g.origen!==origen&&g.cat!==cat)return false;
+    if(g.itemId&&String(g.itemId)===String(item.id))return true;
+    return nombre&&String(g.desc||'').trim().startsWith(nombre);
+  });
+  borrar.forEach(g=>{
+    if(g._sbid)deleteFromSupabase('gastos',g._sbid);
+    limpiarActividad('gasto',g.id,g.desc);
+  });
+  D.gastos=D.gastos.filter(g=>!borrar.includes(g));
+  return before-D.gastos.length;
+}
+function limpiarGastosMaterialesHuerfanos(){
+  const before=D.gastos.length;
+  const borrar=D.gastos.filter(g=>{
+    if(g.origen==='Filamentos'){
+      if(g.itemId)return !D.filamentos.some(f=>String(f.id)===String(g.itemId));
+      const desc=String(g.desc||'').trim();
+      return desc&&!D.filamentos.some(f=>desc.startsWith((f.nombre||'').trim()));
+    }
+    if(g.origen==='Consumibles'){
+      if(g.itemId)return !D.consumibles.some(c=>String(c.id)===String(g.itemId));
+      const desc=String(g.desc||'').trim();
+      return desc&&!D.consumibles.some(c=>desc.startsWith((c.nombre||'').trim()));
+    }
+    return false;
+  });
+  borrar.forEach(g=>{
+    if(g._sbid)deleteFromSupabase('gastos',g._sbid);
+    limpiarActividad('gasto',g.id,g.desc);
+  });
+  if(borrar.length){
+    D.gastos=D.gastos.filter(g=>!borrar.includes(g));
+    save();
+  }
+  return before-D.gastos.length;
+}
 function stockColor(pct){if(pct>40)return'stock-ok';if(pct>15)return'stock-low';return'stock-empty';}
 function stockPct(f){return Math.min(100,Math.round((f.stock/f.peso)*100));}
 function notifyLowConsumibles(items){
@@ -1256,7 +1299,7 @@ function saveFilamento(id){
   } else {
     D.filamentos.push(f);
     saveToSupabase('filamentos',f);
-    const g={id:D.nextId.gasto++,fecha:today(),cat:'Filamento',desc:f.nombre+' — '+f.material+' '+f.color,prov:f.marca+(f.proveedor?' / '+f.proveedor:''),importe:f.precio,origen:'Filamentos'};
+    const g={id:D.nextId.gasto++,fecha:today(),cat:'Filamento',desc:f.nombre+' — '+f.material+' '+f.color,prov:f.marca+(f.proveedor?' / '+f.proveedor:''),importe:f.precio,origen:'Filamentos',itemId:f.id};
     D.gastos.push(g);
     saveToSupabase('gastos',g);
     addActividad('Filamento añadido: '+f.nombre,{tipo:'filamento',refType:'filamento',refId:f.id});
@@ -1288,7 +1331,7 @@ function editFilamento(id){
       <button class="btn btn-ghost" onclick="closeModal()">Cancelar</button>
     </div>`);
 }
-function delFilamento(id){if(!confirm('¿Borrar?'))return;const f=D.filamentos.find(x=>x.id===id);if(f&&f._sbid)deleteFromSupabase('filamentos',f._sbid);limpiarActividad('filamento',id,f?.nombre);D.filamentos=D.filamentos.filter(f=>f.id!==id);save();renderFilamentos();notify('Filamento eliminado');}
+function delFilamento(id){if(!confirm('¿Borrar? También se quitará del Balance el gasto vinculado a este filamento.'))return;const f=D.filamentos.find(x=>x.id===id);if(f&&f._sbid)deleteFromSupabase('filamentos',f._sbid);const n=borrarGastosVinculados('filamento',f);limpiarActividad('filamento',id,f?.nombre);D.filamentos=D.filamentos.filter(f=>f.id!==id);save();renderFilamentos();if(document.getElementById('page-balance')?.classList.contains('active'))renderBalance();notify('Filamento eliminado'+(n?' y gasto quitado del balance':''));}
 
 // ══════════════════════════════════════════════════════
 // CONSUMIBLES
@@ -1337,7 +1380,7 @@ function saveConsumible(id){
   } else {
     D.consumibles.push(c);
     saveToSupabase('consumibles',c);
-    const g={id:D.nextId.gasto++,fecha:today(),cat:'Accesorio',desc:c.nombre+(c.desc?' — '+c.desc:''),prov:c.proveedor,importe:c.precio,origen:'Consumibles'};
+    const g={id:D.nextId.gasto++,fecha:today(),cat:'Accesorio',desc:c.nombre+(c.desc?' — '+c.desc:''),prov:c.proveedor,importe:c.precio,origen:'Consumibles',itemId:c.id};
     D.gastos.push(g);
     saveToSupabase('gastos',g);
   }
@@ -1351,7 +1394,7 @@ function editConsumible(id){
     <div class="form-row cols2"><div><label>Proveedor</label><input type="text" id="mc-prov" value="${c.proveedor||''}"></div><div><label>Link</label><input type="text" id="mc-link" value="${c.link||''}"></div></div>
     <div style="display:flex;gap:8px;margin-top:10px"><button class="btn btn-primary" style="flex:1" onclick="saveConsumible(${id})">Guardar</button><button class="btn btn-ghost" onclick="closeModal()">Cancelar</button></div>`);
 }
-function delConsumible(id){if(!confirm('¿Borrar?'))return;const c=D.consumibles.find(x=>x.id===id);if(c&&c._sbid)deleteFromSupabase('consumibles',c._sbid);limpiarActividad('consumible',id,c?.nombre);D.consumibles=D.consumibles.filter(c=>c.id!==id);save();renderConsumibles();notify('Consumible eliminado');}
+function delConsumible(id){if(!confirm('¿Borrar? También se quitará del Balance el gasto vinculado a este consumible.'))return;const c=D.consumibles.find(x=>x.id===id);if(c&&c._sbid)deleteFromSupabase('consumibles',c._sbid);const n=borrarGastosVinculados('consumible',c);limpiarActividad('consumible',id,c?.nombre);D.consumibles=D.consumibles.filter(c=>c.id!==id);save();renderConsumibles();if(document.getElementById('page-balance')?.classList.contains('active'))renderBalance();notify('Consumible eliminado'+(n?' y gasto quitado del balance':''));}
 
 // ══════════════════════════════════════════════════════
 // CATÁLOGO
@@ -1639,6 +1682,7 @@ function delCobro(id){
 // ══════════════════════════════════════════════════════
 let chartInst=null;
 function renderBalance(){
+  limpiarGastosMaterialesHuerfanos();
   const tG=D.gastos.reduce((s,g)=>s+parseFloat(g.importe||0),0);
   const tI=D.cobros.reduce((s,c)=>s+parseFloat(c.importe||0),0);
   const saldo=tI-tG;
