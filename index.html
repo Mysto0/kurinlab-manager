@@ -1635,11 +1635,122 @@ function renderCatalogo(){
     <td><input type="text" value="${c.notasInternas||c.notas||''}" placeholder="notas internas..." style="width:130px;padding:5px 7px;font-size:12px" onchange="setCF(${c.id},'notasInternas',this.value)"></td>
     <td style="white-space:nowrap">
       <button class="btn btn-pdf" onclick="openDocModal(${c.id})">DOC</button>
+      <button class="btn btn-ghost" style="padding:5px 9px;font-size:11px;margin-left:4px" onclick="editCatalogoItem(${c.id})">Editar</button>
       ${c.stockDescontado?`<button class="btn btn-ghost" style="padding:5px 9px;font-size:11px;margin-left:4px" onclick="revertirStockPedido(${c.id})">Stock</button>`:''}
       <button class="btn btn-ghost" style="padding:5px 9px;font-size:11px;margin-left:4px" onclick="duplicarPedido(${c.id})">Duplicar</button>
       <button class="action-btn" onclick="delCatalogo(${c.id})" style="margin-left:4px">✕</button>
     </td>
   </tr>`).join('');
+}
+function parseTiempoPedido(item){
+  if(item.horas!==undefined||item.minutos!==undefined)return {h:parseFloat(item.horas)||0,min:parseFloat(item.minutos)||0};
+  const m=String(item.tiempo||'').match(/(\d+(?:\.\d+)?)h\s+(\d+(?:\.\d+)?)min/);
+  return m?{h:parseFloat(m[1])||0,min:parseFloat(m[2])||0}:{h:1,min:30};
+}
+function editCatalogoItem(id){
+  const item=D.catalogo.find(c=>c.id===id);if(!item)return;
+  const t=parseTiempoPedido(item);
+  const filOpts=D.filamentos.map(f=>`<option value="${f.id}">${f.nombre} (${fmt4(f.precio/f.peso)}/g)</option>`).join('');
+  const conOpts=D.consumibles.map(c=>`<option value="${c.id}">${c.nombre} (${fmt(c.precio/c.uds)}/ud)</option>`).join('');
+  const filRows=[0,1,2,3].map(i=>{
+    const u=(item.usosFilamentos||[])[i]||{};
+    return `<div class="form-row cols3" style="margin-bottom:8px">
+      <div><label>Filamento ${i+1}</label><select id="ecf-sel-${i}"><option value="">— Ninguno —</option>${filOpts}</select></div>
+      <div><label>Gramos</label><input type="number" id="ecf-g-${i}" value="${u.cantidad||0}" min="0" step="0.1"></div>
+      <div><label>Actual</label><input type="text" value="${u.nombre||'—'}" readonly style="color:var(--text3)"></div>
+    </div>`;
+  }).join('');
+  const conRows=[0,1,2].map(i=>{
+    const u=(item.usosConsumibles||[])[i]||{};
+    return `<div class="form-row cols3" style="margin-bottom:8px">
+      <div><label>Consumible ${i+1}</label><select id="ecc-sel-${i}"><option value="">— Ninguno —</option>${conOpts}</select></div>
+      <div><label>Cantidad</label><input type="number" id="ecc-q-${i}" value="${u.cantidad||0}" min="0" step="1"></div>
+      <div><label>Actual</label><input type="text" value="${u.nombre||'—'}" readonly style="color:var(--text3)"></div>
+    </div>`;
+  }).join('');
+  openModal(`<div style="font-family:var(--display);font-size:17px;font-weight:800;margin-bottom:18px">Editar pedido</div>
+    <div class="form-row cols2">
+      <div><label>Producto</label><input type="text" id="ec-nombre" value="${item.nombre||''}"></div>
+      <div><label>Cliente</label><input type="text" id="ec-cliente" value="${item.cliente||''}"></div>
+    </div>
+    <div class="form-row cols2">
+      <div><label>Contacto</label><input type="text" id="ec-contacto" value="${item.contacto||''}"></div>
+      <div><label>Entrega</label><input type="date" id="ec-entrega" value="${displayDateToInput(item.entrega)}"></div>
+    </div>
+    <div class="form-row cols3">
+      <div><label>Horas</label><input type="number" id="ec-horas" value="${t.h}" min="0" step="1"></div>
+      <div><label>Minutos</label><input type="number" id="ec-minutos" value="${t.min}" min="0" max="59"></div>
+      <div><label>Precio acordado (€)</label><input type="number" id="ec-precio" value="${item.precioAcordado||''}" step="0.01"></div>
+    </div>
+    <div class="form-row cols2">
+      <div><label>Consumo (W)</label><input type="number" id="ec-watts" value="${item.watts||D.settings.watts||65}"></div>
+      <div><label>Precio kWh (€)</label><input type="number" id="ec-kwh" value="${item.kwh||D.settings.kwh||0.18}" step="0.001"></div>
+    </div>
+    <div class="card" style="padding:14px;margin-bottom:12px"><div class="card-title">Filamentos</div>${filRows}</div>
+    <div class="card" style="padding:14px;margin-bottom:12px"><div class="card-title">Consumibles</div>${conRows}</div>
+    <div class="form-row cols2">
+      <div><label>Notas para documento</label><input type="text" id="ec-notas-doc" value="${item.notasDoc||''}"></div>
+      <div><label>Notas internas</label><input type="text" id="ec-notas-int" value="${item.notasInternas||item.notas||''}"></div>
+    </div>
+    <div style="display:flex;gap:8px;margin-top:10px"><button class="btn btn-primary" style="flex:1" onclick="saveCatalogoEdit(${id})">Guardar cambios</button><button class="btn btn-ghost" onclick="closeModal()">Cancelar</button></div>`);
+  (item.usosFilamentos||[]).forEach((u,i)=>{const sel=document.getElementById(`ecf-sel-${i}`);const f=D.filamentos.find(x=>x.id===u.id)||D.filamentos.find(x=>x.nombre===u.nombre);if(sel&&f)sel.value=f.id;});
+  (item.usosConsumibles||[]).forEach((u,i)=>{const sel=document.getElementById(`ecc-sel-${i}`);const c=D.consumibles.find(x=>x.id===u.id)||D.consumibles.find(x=>x.nombre===u.nombre);if(sel&&c)sel.value=c.id;});
+}
+function devolverStockPedidoSilencioso(item){
+  (item.usosFilamentos||[]).forEach(u=>{
+    const fil=D.filamentos.find(f=>f.id===u.id)||D.filamentos.find(f=>f.nombre===u.nombre);if(!fil)return;
+    fil.stock=(parseFloat(fil.stock)||0)+(parseFloat(u.cantidad)||0);
+    if(fil._sbid)saveToSupabase('filamentos',fil,fil._sbid);
+  });
+  (item.usosConsumibles||[]).forEach(u=>{
+    const con=D.consumibles.find(c=>c.id===u.id)||D.consumibles.find(c=>c.nombre===u.nombre);if(!con)return;
+    con.stock=(parseFloat(con.stock)||0)+(parseFloat(u.cantidad)||0);
+    if(con._sbid)saveToSupabase('consumibles',con,con._sbid);
+  });
+  item.stockDescontado=false;
+}
+function saveCatalogoEdit(id){
+  const item=D.catalogo.find(c=>c.id===id);if(!item)return;
+  const wasDiscounted=!!item.stockDescontado;
+  if(wasDiscounted)devolverStockPedidoSilencioso(item);
+  const usosFilamentos=[],usosConsumibles=[],mats=[];let gramos=0,tFil=0,tCon=0;
+  for(let i=0;i<4;i++){
+    const fid=parseInt(document.getElementById(`ecf-sel-${i}`)?.value||0);
+    const g=parseFloat(document.getElementById(`ecf-g-${i}`)?.value||0);
+    const fil=D.filamentos.find(f=>f.id===fid);
+    if(fil&&g>0){usosFilamentos.push({id:fil.id,nombre:fil.nombre,cantidad:g});mats.push(fil.nombre);gramos+=g;tFil+=g*(fil.precio/fil.peso);}
+  }
+  for(let i=0;i<3;i++){
+    const cid=parseInt(document.getElementById(`ecc-sel-${i}`)?.value||0);
+    const q=parseFloat(document.getElementById(`ecc-q-${i}`)?.value||0);
+    const con=D.consumibles.find(c=>c.id===cid);
+    if(con&&q>0){usosConsumibles.push({id:con.id,nombre:con.nombre,cantidad:q});tCon+=q*(con.precio/con.uds);}
+  }
+  const h=parseFloat(document.getElementById('ec-horas').value||0);
+  const min=parseFloat(document.getElementById('ec-minutos').value||0);
+  const w=parseFloat(document.getElementById('ec-watts').value||65);
+  const k=parseFloat(document.getElementById('ec-kwh').value||0.18);
+  const coste=tFil+(h+min/60)*w/1000*k+tCon;
+  Object.assign(item,{
+    nombre:document.getElementById('ec-nombre').value.trim()||item.nombre,
+    cliente:document.getElementById('ec-cliente').value.trim(),
+    contacto:document.getElementById('ec-contacto').value.trim(),
+    entrega:dateInputValue('ec-entrega').trim(),
+    precioAcordado:parseFloat(document.getElementById('ec-precio').value)||'',
+    horas:h,minutos:min,watts:w,kwh:k,
+    notasDoc:document.getElementById('ec-notas-doc').value.trim(),
+    notasInternas:document.getElementById('ec-notas-int').value.trim(),
+    materiales:mats.join(' + '),gramos:gramos.toFixed(1),tiempo:Math.floor(h)+'h '+Math.floor(min)+'min',
+    coste,precioCalc:coste*((D.multiplicadores[0]?.mult)||3),usosFilamentos,usosConsumibles
+  });
+  if(wasDiscounted)descontarStockPedido(item);
+  const cobro=D.cobros.find(c=>String(c.itemId)===String(item.id));
+  if(cobro){
+    Object.assign(cobro,{nombre:item.nombre,cliente:item.cliente||'',importe:pedidoIngreso(item),coste:pedidoCoste(item),beneficio:pedidoBeneficio(item)});
+    if(cobro._sbid)saveToSupabase('cobros',cobro,cobro._sbid);
+  }
+  if(item._sbid)saveToSupabase('catalogo',item,item._sbid);
+  save();closeModal();refreshCatalogoViews();notify('Pedido actualizado');
 }
 function setCF(id,field,val){
   const item=D.catalogo.find(c=>c.id===id);
@@ -1964,6 +2075,7 @@ function renderPedidos(){
       <td><input type="text" value="${c.notasInternas||c.notas||''}" placeholder="notas internas..." style="width:130px;padding:5px 7px;font-size:12px" onchange="setCF(${c.id},'notasInternas',this.value)"></td>
       <td style="white-space:nowrap">
         <button class="btn btn-pdf" onclick="openDocModal(${c.id})">DOC</button>
+        <button class="btn btn-ghost" style="padding:5px 9px;font-size:11px;margin-left:4px" onclick="editCatalogoItem(${c.id})">Editar</button>
         ${c.stockDescontado?`<button class="btn btn-ghost" style="padding:5px 9px;font-size:11px;margin-left:4px" onclick="revertirStockPedido(${c.id})">Stock</button>`:''}
         <button class="btn btn-ghost" style="padding:5px 9px;font-size:11px;margin-left:4px" onclick="duplicarPedido(${c.id})">Duplicar</button>
         <button class="action-btn" onclick="delCatalogo(${c.id})" style="margin-left:4px">✕</button>
