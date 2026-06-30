@@ -80,6 +80,20 @@ textarea{resize:vertical;min-height:60px;}
 .filament-entry{display:grid;grid-template-columns:minmax(180px,1.5fr) minmax(90px,.7fr) minmax(90px,.7fr) minmax(100px,.8fr) 34px;gap:10px;align-items:end;margin-bottom:8px;}
 .filament-remove{width:34px;height:34px;padding:0;display:grid;place-items:center;}
 .filament-remove[hidden]{display:block;visibility:hidden;pointer-events:none;}
+.filament-picker{position:relative;min-width:0;}
+.filament-search-results{display:none;position:absolute;left:0;right:0;top:calc(100% + 5px);z-index:80;background:var(--bg2);border:1px solid var(--border2);border-radius:8px;box-shadow:0 12px 30px rgba(0,0,0,.35);max-height:260px;overflow-y:auto;padding:4px;}
+.filament-search-results.open{display:block;}
+.filament-search-option{width:100%;border:0;background:transparent;color:var(--text);text-align:left;padding:9px 10px;border-radius:6px;cursor:pointer;font-family:var(--sans);}
+.filament-search-option:hover,.filament-search-option:focus{background:var(--bg3);outline:none;}
+.filament-search-name{display:block;font-size:13px;font-weight:600;}
+.filament-search-meta{display:block;color:var(--text3);font-family:var(--mono);font-size:10px;margin-top:1px;}
+.filament-search-empty{padding:10px;color:var(--text3);font-size:12px;text-align:center;}
+.print-plate{border:1px solid var(--border);border-radius:8px;padding:14px;margin-bottom:12px;background:var(--bg3);}
+.print-plate-header{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px;}
+.print-plate-title{font-family:var(--display);font-size:13px;font-weight:800;color:var(--text);}
+.print-plate-actions{display:flex;gap:6px;align-items:center;}
+.plate-filaments{margin-top:12px;padding-top:12px;border-top:1px solid var(--border);}
+.plate-add-filament{margin-top:2px;}
 .quick-actions{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:18px;}
 .quick-actions .btn{display:inline-flex;align-items:center;gap:6px;}
 .btn{padding:9px 18px;border-radius:8px;font-size:13px;font-weight:500;cursor:pointer;transition:all 0.15s;border:none;font-family:var(--sans);}
@@ -215,6 +229,9 @@ tr:hover td{background:var(--bg3);}
   .filament-entry{grid-template-columns:1fr 1fr;}
   .filament-entry>div:first-child{grid-column:1/-1;}
   .filament-remove{grid-column:2;justify-self:end;}
+  .filament-search-results{max-height:38dvh;}
+  .print-plate{padding:12px;}
+  .print-plate-header{align-items:flex-start;}
   .form-row{gap:8px;margin-bottom:8px;}
   input[type=text],input[type=number],input[type=email],input[type=date],select,textarea{font-size:16px;padding:10px 12px;min-height:44px;max-width:100%;}
   .btn{min-height:44px;padding:10px 14px;touch-action:manipulation;-webkit-tap-highlight-color:transparent;}
@@ -345,18 +362,14 @@ tr:hover td{background:var(--bg3);}
         <div class="form-row"><div><label>Notas internas</label><input type="text" id="c-notas-internas" placeholder="Recordatorios tuyos, no salen en documentos..."></div></div>
       </div>
       <div class="card">
-        <div class="card-title">Filamentos</div>
-        <div id="fil-rows"></div>
-        <button type="button" class="btn btn-ghost" onclick="addFilamentRow()">+ Añadir filamento</button>
+        <div class="card-title">Placas de impresión</div>
+        <div id="plate-rows"></div>
+        <button type="button" class="btn btn-ghost" onclick="addPrintPlate()">+ Añadir placa</button>
       </div>
       <div class="card">
         <div class="card-title">Electricidad</div>
         <div class="form-row cols3">
-          <div><label>Horas</label><input type="number" id="c-horas" value="1" min="0" step="1" oninput="calcular()"></div>
-          <div><label>Minutos</label><input type="number" id="c-minutos" value="30" min="0" max="59" oninput="calcular()"></div>
-          <div><label>Total</label><input type="text" id="c-total-h" readonly style="color:var(--text3)"></div>
-        </div>
-        <div class="form-row cols2">
+          <div><label>Tiempo total</label><input type="text" id="c-total-h" readonly style="color:var(--text3)"></div>
           <div><label>Consumo (W)</label><input type="number" id="c-watts" value="65" oninput="calcular()"></div>
           <div><label>Precio kWh (€)</label><input type="number" id="c-kwh" value="0.18" step="0.001" oninput="calcular()"></div>
         </div>
@@ -370,6 +383,7 @@ tr:hover td{background:var(--bg3);}
       <div class="card">
         <div class="card-title">Resumen</div>
         <div class="calc-result">
+          <div class="calc-line"><span class="calc-line-label">Placas / tiempo</span><span class="calc-line-val" id="r-plates">1 · 0h 0min</span></div>
           <div class="calc-line"><span class="calc-line-label">Filamentos</span><span class="calc-line-val" id="r-fil">0,00 €</span></div>
           <div class="calc-line"><span class="calc-line-label">Electricidad</span><span class="calc-line-val" id="r-elec">0,00 €</span></div>
           <div class="calc-line"><span class="calc-line-label">Consumibles</span><span class="calc-line-val" id="r-con">0,00 €</span></div>
@@ -1183,36 +1197,99 @@ function initCalc(){
   renderFilRows();renderConRows();renderMultRows();calcular();
 }
 function renderFilRows(){
-  const el=document.getElementById('fil-rows');el.innerHTML='';
-  addFilamentRow({gramos:15});
+  const el=document.getElementById('plate-rows');el.innerHTML='';
+  addPrintPlate({horas:1,minutos:30,filamentos:[{cantidad:15}]});
 }
-function addFilamentRow(values={}){
-  const el=document.getElementById('fil-rows');if(!el)return;
-  const opts=D.filamentos.filter(f=>!f.archivado).map(f=>`<option value="${f.id}">${f.nombre}</option>`).join('');
+function addPrintPlate(values={}){
+  const el=document.getElementById('plate-rows');if(!el)return;
+  const plate=document.createElement('div');plate.className='print-plate';
+  plate.innerHTML=`<div class="print-plate-header"><div class="print-plate-title">Placa</div><div class="print-plate-actions"><button type="button" class="action-btn plate-remove" title="Quitar placa" onclick="removePrintPlate(this)">×</button></div></div>
+    <div class="form-row cols3"><div><label>Horas</label><input class="plate-hours" type="number" value="${values.horas??0}" min="0" step="0.1" oninput="calcular()"></div><div><label>Minutos</label><input class="plate-minutes" type="number" value="${values.minutos??0}" min="0" max="59" step="1" oninput="calcular()"></div><div><label>Duración</label><input class="plate-duration" type="text" readonly style="color:var(--text3)"></div></div>
+    <div class="plate-filaments"><div class="plate-filament-rows"></div><button type="button" class="btn btn-ghost plate-add-filament" onclick="addFilamentRow(this.closest('.print-plate'))">+ Añadir filamento</button></div>`;
+  el.appendChild(plate);
+  const filamentos=values.filamentos?.length?values.filamentos:[{}];
+  filamentos.forEach(f=>addFilamentRow(plate,{filamentoId:f.id||f.filamentoId,cantidad:f.cantidad??f.gramos??0},false));
+  syncPrintPlates();calcular();
+}
+function removePrintPlate(button){
+  const plates=document.querySelectorAll('#plate-rows .print-plate');if(plates.length<=1)return;
+  button.closest('.print-plate')?.remove();syncPrintPlates();calcular();
+}
+function syncPrintPlates(){
+  const plates=[...document.querySelectorAll('#plate-rows .print-plate')];
+  plates.forEach((plate,i)=>{plate.querySelector('.print-plate-title').textContent=`Placa ${i+1}`;plate.querySelector('.plate-remove').hidden=plates.length===1;syncFilamentRows(plate);});
+}
+function addFilamentRow(plate,values={},shouldCalculate=true){
+  if(!plate?.classList?.contains('print-plate'))plate=document.querySelector('#plate-rows .print-plate');
+  const el=plate?.querySelector('.plate-filament-rows');if(!el)return;
   const row=document.createElement('div');row.className='filament-entry calc-fil-row';
-  row.innerHTML=`<div><label class="filament-label">Filamento</label><select class="cf-sel" onchange="calcular()"><option value="">— Ninguno —</option>${opts}</select></div>
-    <div><label>Gramos</label><input class="cf-g" type="number" value="${values.gramos??0}" min="0" step="0.1" oninput="calcular()"></div>
+  row.innerHTML=`<div class="filament-picker"><label class="filament-label">Filamento</label><input class="cf-search" type="text" autocomplete="off" placeholder="Buscar por color, PLA, TPU, marca..." onfocus="renderFilamentMatches(this)" oninput="handleFilamentSearch(this)" onkeydown="handleFilamentSearchKey(event,this)"><div class="filament-search-results"></div></div>
+    <div><label>Gramos</label><input class="cf-g" type="number" value="${values.cantidad??values.gramos??0}" min="0" step="0.1" oninput="calcular()"></div>
     <div><label>€/g</label><input class="cf-eg" type="text" readonly style="color:var(--text3)"></div>
     <div><label>Coste</label><input class="cf-c" type="text" readonly style="color:var(--green)"></div>
     <button type="button" class="btn btn-ghost filament-remove" title="Quitar filamento" onclick="removeFilamentRow(this)">×</button>`;
   el.appendChild(row);
-  if(values.filamentoId)row.querySelector('.cf-sel').value=values.filamentoId;
-  syncFilamentRows();calcular();
+  if(values.filamentoId){const f=D.filamentos.find(x=>String(x.id)===String(values.filamentoId));if(f)selectCalcFilament(row.querySelector('.cf-search'),f.id);}
+  syncFilamentRows(plate);if(shouldCalculate)calcular();
 }
+function normalizeSearch(value){return String(value||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim();}
+function filamentSearchMatches(query){
+  const tokens=normalizeSearch(query).split(/\s+/).filter(Boolean);if(!tokens.length)return[];
+  return D.filamentos.filter(f=>!f.archivado&&tokens.every(token=>normalizeSearch(`${f.nombre} ${f.material} ${f.color} ${f.marca} ${f.proveedor}`).includes(token))).slice(0,10);
+}
+function renderFilamentMatches(input){
+  const results=input.closest('.filament-picker')?.querySelector('.filament-search-results');if(!results)return;
+  const query=input.value.trim();
+  if(!query){results.innerHTML='<div class="filament-search-empty">Escribe para buscar un filamento</div>';results.classList.add('open');return;}
+  const matches=filamentSearchMatches(query);
+  results.innerHTML=matches.map(f=>`<button type="button" class="filament-search-option" data-filament-id="${f.id}" onmousedown="event.preventDefault()" onclick="selectCalcFilament(this.closest('.filament-picker').querySelector('.cf-search'),${f.id})"><span class="filament-search-name">${f.nombre}</span><span class="filament-search-meta">${[f.material,f.color,f.marca].filter(Boolean).join(' · ')}</span></button>`).join('')||'<div class="filament-search-empty">No hay coincidencias</div>';
+  results.classList.add('open');
+}
+function handleFilamentSearch(input){input.dataset.filamentId='';renderFilamentMatches(input);calcular();updateEditPlateCosts();}
+function handleFilamentSearchKey(event,input){
+  const results=input.closest('.filament-picker')?.querySelector('.filament-search-results');if(!results)return;
+  if(event.key==='Escape'){results.classList.remove('open');input.blur();return;}
+  if(event.key==='Enter'){const first=results.querySelector('.filament-search-option');if(first){event.preventDefault();first.click();}}
+  if(event.key==='ArrowDown'){const first=results.querySelector('.filament-search-option');if(first){event.preventDefault();first.focus();}}
+}
+function selectCalcFilament(input,id){
+  const fil=D.filamentos.find(f=>String(f.id)===String(id));if(!fil)return;
+  input.value=fil.nombre;input.dataset.filamentId=fil.id;
+  input.closest('.filament-picker')?.querySelector('.filament-search-results')?.classList.remove('open');calcular();updateEditPlateCosts();
+}
+function calcFilamentId(row){return parseInt(row.querySelector('.cf-search')?.dataset.filamentId||0);}
+document.addEventListener('click',event=>{if(!event.target.closest('.filament-picker'))document.querySelectorAll('.filament-search-results.open').forEach(el=>el.classList.remove('open'));});
 function removeFilamentRow(button){
-  const rows=document.querySelectorAll('#fil-rows .calc-fil-row');if(rows.length<=1)return;
-  button.closest('.calc-fil-row')?.remove();syncFilamentRows();calcular();
+  const plate=button.closest('.print-plate');const rows=plate?.querySelectorAll('.calc-fil-row')||[];if(rows.length<=1)return;
+  button.closest('.calc-fil-row')?.remove();syncFilamentRows(plate);calcular();
 }
-function syncFilamentRows(){
-  const rows=[...document.querySelectorAll('#fil-rows .calc-fil-row')];
+function syncFilamentRows(plate){
+  const rows=[...(plate?.querySelectorAll('.calc-fil-row')||[])];
   rows.forEach((row,i)=>{row.querySelector('.filament-label').textContent=`Filamento ${i+1}`;row.querySelector('.filament-remove').hidden=rows.length===1;});
 }
-function calcFilamentUses(){
-  return [...document.querySelectorAll('#fil-rows .calc-fil-row')].map(row=>{
-    const fid=parseInt(row.querySelector('.cf-sel')?.value||0);
+function calcFilamentUses(container=document){
+  return [...container.querySelectorAll('.calc-fil-row')].map(row=>{
+    const fid=calcFilamentId(row);
     const cantidad=parseFloat(row.querySelector('.cf-g')?.value||0);
     return {filamento:D.filamentos.find(f=>f.id===fid),cantidad};
   }).filter(u=>u.filamento&&u.cantidad>0);
+}
+function calcPlateData(){
+  return [...document.querySelectorAll('#plate-rows .print-plate')].map((plate,i)=>({
+    nombre:`Placa ${i+1}`,
+    horas:parseFloat(plate.querySelector('.plate-hours')?.value||0),
+    minutos:parseFloat(plate.querySelector('.plate-minutes')?.value||0),
+    filamentos:calcFilamentUses(plate).map(u=>({id:u.filamento.id,nombre:u.filamento.nombre,cantidad:u.cantidad}))
+  }));
+}
+function aggregateFilamentUses(usos){
+  const grouped=new Map();
+  usos.forEach(u=>{const key=String(u.id||u.nombre);const prev=grouped.get(key)||{id:u.id,nombre:u.nombre,cantidad:0};prev.cantidad+=(parseFloat(u.cantidad)||0);grouped.set(key,prev);});
+  return [...grouped.values()];
+}
+function formatDuration(hours){
+  const totalMinutes=Math.max(0,Math.round((parseFloat(hours)||0)*60));
+  return `${Math.floor(totalMinutes/60)}h ${totalMinutes%60}min`;
 }
 function renderConRows(){
   const el=document.getElementById('con-rows');el.innerHTML='';
@@ -1243,17 +1320,17 @@ function renderMultRows(){
   </div>`;
 }
 function calcular(){
-  const h=parseFloat(document.getElementById('c-horas')?.value||0);
-  const m=parseFloat(document.getElementById('c-minutos')?.value||0);
-  const th=h+m/60;
-  const thEl=document.getElementById('c-total-h');if(thEl)thEl.value=th.toFixed(2)+' h';
+  const placas=calcPlateData();
+  const th=placas.reduce((total,p)=>total+p.horas+p.minutos/60,0);
+  document.querySelectorAll('#plate-rows .print-plate').forEach((plate,i)=>{const duration=plate.querySelector('.plate-duration');if(duration)duration.value=formatDuration((placas[i]?.horas||0)+(placas[i]?.minutos||0)/60);});
+  const thEl=document.getElementById('c-total-h');if(thEl)thEl.value=formatDuration(th);
   const w=parseFloat(document.getElementById('c-watts')?.value||65);
   const k=parseFloat(document.getElementById('c-kwh')?.value||0.18);
   const elec=th*w/1000*k;
   let tFil=0;
-  document.querySelectorAll('#fil-rows .calc-fil-row').forEach(row=>{
-    const sel=row.querySelector('.cf-sel');const gEl=row.querySelector('.cf-g');
-    const fid=parseInt(sel?.value||0);const g=parseFloat(gEl?.value||0);
+  document.querySelectorAll('#plate-rows .calc-fil-row').forEach(row=>{
+    const gEl=row.querySelector('.cf-g');
+    const fid=calcFilamentId(row);const g=parseFloat(gEl?.value||0);
     const fil=D.filamentos.find(f=>f.id===fid);
     const epg=fil&&fil.peso>0?fil.precio/fil.peso:0;
     const cost=g*epg;tFil+=cost;
@@ -1273,6 +1350,7 @@ function calcular(){
     if(ccEl)ccEl.value=fmt(cost);
   }
   const total=tFil+elec+tCon;
+  const platesEl=document.getElementById('r-plates');if(platesEl)platesEl.textContent=`${placas.length} ${placas.length===1?'placa':'placas'} · ${formatDuration(th)}`;
   document.getElementById('r-fil').textContent=fmt(tFil);
   document.getElementById('r-elec').textContent=fmt(elec);
   document.getElementById('r-con').textContent=fmt(tCon);
@@ -1288,8 +1366,6 @@ function calcular(){
 function limpiarCalculadora(){
   ['c-nombre','c-cliente','c-contacto','c-entrega','c-notas-internas'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
   const anticipo=document.getElementById('c-anticipo');if(anticipo)anticipo.value='0';
-  const horas=document.getElementById('c-horas');if(horas)horas.value='1';
-  const minutos=document.getElementById('c-minutos');if(minutos)minutos.value='30';
   renderFilRows();
   for(let i=0;i<3;i++){
     const sel=document.getElementById(`cc-sel-${i}`);const q=document.getElementById(`cc-q-${i}`);
@@ -1340,10 +1416,10 @@ function guardarEnCatalogo(){
   const entrega=dateInputValue('c-entrega').trim();
   const anticipo=parseFloat(document.getElementById('c-anticipo').value)||0;
   const notasInternas=document.getElementById('c-notas-internas').value.trim();
-  const calcFilamentos=calcFilamentUses();
-  const mats=calcFilamentos.map(u=>u.filamento.nombre);
-  const gramos=calcFilamentos.reduce((total,u)=>total+u.cantidad,0);
-  const usosFilamentos=calcFilamentos.map(u=>({id:u.filamento.id,nombre:u.filamento.nombre,cantidad:u.cantidad}));
+  const placas=calcPlateData();
+  const usosFilamentos=aggregateFilamentUses(placas.flatMap(p=>p.filamentos));
+  const mats=[...new Set(usosFilamentos.map(u=>u.nombre))];
+  const gramos=usosFilamentos.reduce((total,u)=>total+(parseFloat(u.cantidad)||0),0);
   const usosConsumibles=[];
   // Registrar consumibles previstos
   for(let i=0;i<3;i++){
@@ -1352,18 +1428,18 @@ function guardarEnCatalogo(){
     const con=D.consumibles.find(c=>c.id===cid);
     if(con&&q>0)usosConsumibles.push({id:con.id,nombre:con.nombre,cantidad:q});
   }
-  const h=parseFloat(document.getElementById('c-horas').value||0);
-  const min=parseFloat(document.getElementById('c-minutos').value||0);
-  const th=h+min/60;
+  const th=placas.reduce((total,p)=>total+p.horas+p.minutos/60,0);
+  const totalMinutes=Math.max(0,Math.round(th*60));
+  const h=Math.floor(totalMinutes/60);const min=totalMinutes%60;
   const w=parseFloat(document.getElementById('c-watts').value||65);
   const k=parseFloat(document.getElementById('c-kwh').value||0.18);
   let tFil=0,tCon=0;
-  calcFilamentos.forEach(u=>{tFil+=u.cantidad*(u.filamento.precio/u.filamento.peso);});
+  usosFilamentos.forEach(u=>{const fil=D.filamentos.find(f=>String(f.id)===String(u.id))||D.filamentos.find(f=>f.nombre===u.nombre);if(fil&&fil.peso>0)tFil+=u.cantidad*(fil.precio/fil.peso);});
   for(let i=0;i<3;i++){const sel=document.getElementById(`cc-sel-${i}`);const qEl=document.getElementById(`cc-q-${i}`);const cid=parseInt(sel?.value||0);const q=parseFloat(qEl?.value||0);const con=D.consumibles.find(c=>c.id===cid);if(con&&q>0)tCon+=q*consumibleCosteUnidad(con);}
   const total=tFil+th*w/1000*k+tCon;
   const mRef=D.multiplicadores[0];
   const precioCalc=total*(mRef?.mult||3);
-  const item={id:D.nextId.cat++,nombre,cliente,contacto,entrega,anticipo,notasInternas,materiales:mats.join(' + '),gramos:gramos.toFixed(1),tiempo:Math.floor(h)+'h '+Math.floor(min)+'min',coste:total,precioCalc,precioAcordado:'',estado:'Presupuesto',fecha:today(),fechaCobro:'',notas:'',usosFilamentos,usosConsumibles,stockDescontado:false};
+  const item={id:D.nextId.cat++,nombre,cliente,contacto,entrega,anticipo,notasInternas,materiales:mats.join(' + '),gramos:gramos.toFixed(1),tiempo:`${h}h ${min}min`,horas:h,minutos:min,watts:w,kwh:k,placas,coste:total,precioCalc,precioAcordado:'',estado:'Presupuesto',fecha:today(),fechaCobro:'',notas:'',usosFilamentos,usosConsumibles,stockDescontado:false};
   D.catalogo.push(item);
   saveToSupabase('catalogo',item);
   addActividad(`Presupuesto guardado: ${nombre}`,{tipo:'guardar',refType:'catalogo',refId:item.id});
@@ -1714,12 +1790,9 @@ function parseTiempoPedido(item){
 }
 function editCatalogoItem(id){
   const item=D.catalogo.find(c=>c.id===id);if(!item)return;
-  const t=parseTiempoPedido(item);
-  const filUsados=item.usosFilamentos||[];const conUsados=item.usosConsumibles||[];
-  const filOpts=D.filamentos.filter(f=>!f.archivado||filUsados.some(u=>String(u.id)===String(f.id)||u.nombre===f.nombre)).map(f=>`<option value="${f.id}">${f.nombre} (${fmt4(f.precio/f.peso)}/g)</option>`).join('');
+  const placas=pedidoPlacas(item);const conUsados=item.usosConsumibles||[];
   const conOpts=D.consumibles.filter(c=>!c.archivado||conUsados.some(u=>String(u.id)===String(c.id)||u.nombre===c.nombre)).map(c=>`<option value="${c.id}">${c.nombre} (${fmt(consumibleCosteUnidad(c))}/ud)</option>`).join('');
-  const filUsos=(item.usosFilamentos||[]).length?item.usosFilamentos:[{}];
-  const filRows=filUsos.map((u,i)=>editFilamentRowHtml(i,u,filOpts)).join('');
+  const plateRows=placas.map((p,i)=>editPlateHtml(i,p)).join('');
   const conRows=[0,1,2].map(i=>{
     const u=(item.usosConsumibles||[])[i]||{};
     return `<div class="form-row cols3" style="margin-bottom:8px">
@@ -1738,37 +1811,51 @@ function editCatalogoItem(id){
       <div><label>Entrega</label><input type="date" id="ec-entrega" value="${displayDateToInput(item.entrega)}"></div>
     </div>
     <div class="form-row cols3">
-      <div><label>Horas</label><input type="number" id="ec-horas" value="${t.h}" min="0" step="1"></div>
-      <div><label>Minutos</label><input type="number" id="ec-minutos" value="${t.min}" min="0" max="59"></div>
       <div><label>Precio acordado (€)</label><input type="number" id="ec-precio" value="${item.precioAcordado||''}" step="0.01"></div>
-    </div>
-    <div class="form-row cols2">
       <div><label>Consumo (W)</label><input type="number" id="ec-watts" value="${item.watts||D.settings.watts||65}"></div>
       <div><label>Precio kWh (€)</label><input type="number" id="ec-kwh" value="${item.kwh||D.settings.kwh||0.18}" step="0.001"></div>
     </div>
-    <div class="card" style="padding:14px;margin-bottom:12px"><div class="card-title">Filamentos</div><div id="ec-fil-rows">${filRows}</div><button type="button" class="btn btn-ghost" onclick="addEditFilamentRow()">+ Añadir filamento</button></div>
+    <div class="card" style="padding:14px;margin-bottom:12px"><div class="card-title">Placas de impresión</div><div id="ec-plate-rows">${plateRows}</div><button type="button" class="btn btn-ghost" onclick="addEditPlate()">+ Añadir placa</button></div>
     <div class="card" style="padding:14px;margin-bottom:12px"><div class="card-title">Consumibles</div>${conRows}</div>
     <div class="form-row"><div><label>Notas internas</label><input type="text" id="ec-notas-int" value="${item.notasInternas||item.notas||''}"></div></div>
     <div style="display:flex;gap:8px;margin-top:10px"><button class="btn btn-primary" style="flex:1" onclick="saveCatalogoEdit(${id})">Guardar cambios</button><button class="btn btn-ghost" onclick="closeModal()">Cancelar</button></div>`);
-  document.querySelectorAll('#ec-fil-rows .edit-fil-row').forEach((row,i)=>{const u=(item.usosFilamentos||[])[i]||{};const f=D.filamentos.find(x=>x.id===u.id)||D.filamentos.find(x=>x.nombre===u.nombre);if(f)row.querySelector('.ecf-sel').value=f.id;});
   (item.usosConsumibles||[]).forEach((u,i)=>{const sel=document.getElementById(`ecc-sel-${i}`);const c=D.consumibles.find(x=>x.id===u.id)||D.consumibles.find(x=>x.nombre===u.nombre);if(sel&&c)sel.value=c.id;});
-  syncEditFilamentRows();
+  syncEditPlates();updateEditPlateCosts();
 }
-function editFilamentRowHtml(i,u={},opts=''){
+function pedidoPlacas(item){
+  if(Array.isArray(item.placas)&&item.placas.length)return item.placas.map((p,i)=>({nombre:`Placa ${i+1}`,horas:parseFloat(p.horas)||0,minutos:parseFloat(p.minutos)||0,filamentos:(p.filamentos||[]).map(u=>({...u}))}));
+  const t=parseTiempoPedido(item);
+  return [{nombre:'Placa 1',horas:t.h,minutos:t.min,filamentos:(item.usosFilamentos||[]).map(u=>({...u}))}];
+}
+function editPlateHtml(i,plate={}){
+  const filamentos=plate.filamentos?.length?plate.filamentos:[{}];
+  return `<div class="print-plate edit-print-plate"><div class="print-plate-header"><div class="print-plate-title">Placa ${i+1}</div><div class="print-plate-actions"><button type="button" class="action-btn plate-remove" title="Quitar placa" onclick="removeEditPlate(this)">×</button></div></div>
+    <div class="form-row cols3"><div><label>Horas</label><input class="plate-hours" type="number" value="${plate.horas||0}" min="0" step="0.1" oninput="updateEditPlateCosts()"></div><div><label>Minutos</label><input class="plate-minutes" type="number" value="${plate.minutos||0}" min="0" max="59" step="1" oninput="updateEditPlateCosts()"></div><div><label>Duración</label><input class="plate-duration" type="text" readonly style="color:var(--text3)"></div></div>
+    <div class="plate-filaments"><div class="edit-plate-filament-rows">${filamentos.map((u,j)=>editFilamentRowHtml(j,u)).join('')}</div><button type="button" class="btn btn-ghost plate-add-filament" onclick="addEditFilamentRow(this.closest('.edit-print-plate'))">+ Añadir filamento</button></div></div>`;
+}
+function editFilamentRowHtml(i,u={}){
+  const fil=D.filamentos.find(f=>String(f.id)===String(u.id))||D.filamentos.find(f=>f.nombre===u.nombre);
   return `<div class="filament-entry edit-fil-row">
-    <div><label class="filament-label">Filamento ${i+1}</label><select class="ecf-sel"><option value="">— Ninguno —</option>${opts}</select></div>
-    <div><label>Gramos</label><input class="ecf-g" type="number" value="${u.cantidad||0}" min="0" step="0.1"></div>
-    <div><label>Actual</label><input type="text" value="${u.nombre||'—'}" readonly style="color:var(--text3)"></div>
-    <div></div><button type="button" class="btn btn-ghost filament-remove" title="Quitar filamento" onclick="removeEditFilamentRow(this)">×</button>
+    <div class="filament-picker"><label class="filament-label">Filamento ${i+1}</label><input class="cf-search" type="text" autocomplete="off" value="${fil?.nombre||u.nombre||''}" data-filament-id="${fil?.id||u.id||''}" placeholder="Buscar por color, PLA, TPU, marca..." onfocus="renderFilamentMatches(this)" oninput="handleFilamentSearch(this)" onkeydown="handleFilamentSearchKey(event,this)"><div class="filament-search-results"></div></div>
+    <div><label>Gramos</label><input class="ecf-g" type="number" value="${u.cantidad||0}" min="0" step="0.1" oninput="updateEditPlateCosts()"></div>
+    <div><label>€/g</label><input class="ecf-eg" type="text" readonly style="color:var(--text3)"></div>
+    <div><label>Coste</label><input class="ecf-cost" type="text" readonly style="color:var(--green)"></div>
+    <button type="button" class="btn btn-ghost filament-remove" title="Quitar filamento" onclick="removeEditFilamentRow(this)">×</button>
   </div>`;
 }
-function addEditFilamentRow(){
-  const el=document.getElementById('ec-fil-rows');if(!el)return;
-  const opts=D.filamentos.filter(f=>!f.archivado).map(f=>`<option value="${f.id}">${f.nombre} (${fmt4(f.precio/f.peso)}/g)</option>`).join('');
-  el.insertAdjacentHTML('beforeend',editFilamentRowHtml(el.querySelectorAll('.edit-fil-row').length,{},opts));syncEditFilamentRows();
+function addEditPlate(){const el=document.getElementById('ec-plate-rows');if(!el)return;el.insertAdjacentHTML('beforeend',editPlateHtml(el.querySelectorAll('.edit-print-plate').length,{filamentos:[{}]}));syncEditPlates();updateEditPlateCosts();}
+function removeEditPlate(button){const plates=document.querySelectorAll('#ec-plate-rows .edit-print-plate');if(plates.length<=1)return;button.closest('.edit-print-plate')?.remove();syncEditPlates();updateEditPlateCosts();}
+function addEditFilamentRow(plate){
+  const el=plate?.querySelector('.edit-plate-filament-rows');if(!el)return;
+  el.insertAdjacentHTML('beforeend',editFilamentRowHtml(el.querySelectorAll('.edit-fil-row').length,{}));syncEditFilamentRows(plate);updateEditPlateCosts();
 }
-function removeEditFilamentRow(button){const rows=document.querySelectorAll('#ec-fil-rows .edit-fil-row');if(rows.length<=1)return;button.closest('.edit-fil-row')?.remove();syncEditFilamentRows();}
-function syncEditFilamentRows(){const rows=[...document.querySelectorAll('#ec-fil-rows .edit-fil-row')];rows.forEach((row,i)=>{row.querySelector('.filament-label').textContent=`Filamento ${i+1}`;row.querySelector('.filament-remove').hidden=rows.length===1;});}
+function removeEditFilamentRow(button){const plate=button.closest('.edit-print-plate');const rows=plate?.querySelectorAll('.edit-fil-row')||[];if(rows.length<=1)return;button.closest('.edit-fil-row')?.remove();syncEditFilamentRows(plate);updateEditPlateCosts();}
+function syncEditPlates(){const plates=[...document.querySelectorAll('#ec-plate-rows .edit-print-plate')];plates.forEach((plate,i)=>{plate.querySelector('.print-plate-title').textContent=`Placa ${i+1}`;plate.querySelector('.plate-remove').hidden=plates.length===1;syncEditFilamentRows(plate);});}
+function syncEditFilamentRows(plate){const rows=[...(plate?.querySelectorAll('.edit-fil-row')||[])];rows.forEach((row,i)=>{row.querySelector('.filament-label').textContent=`Filamento ${i+1}`;row.querySelector('.filament-remove').hidden=rows.length===1;});}
+function calcEditPlateData(){return [...document.querySelectorAll('#ec-plate-rows .edit-print-plate')].map((plate,i)=>({nombre:`Placa ${i+1}`,horas:parseFloat(plate.querySelector('.plate-hours')?.value||0),minutos:parseFloat(plate.querySelector('.plate-minutes')?.value||0),filamentos:[...plate.querySelectorAll('.edit-fil-row')].map(row=>{const id=calcFilamentId(row);const fil=D.filamentos.find(f=>f.id===id);const cantidad=parseFloat(row.querySelector('.ecf-g')?.value||0);return fil&&cantidad>0?{id:fil.id,nombre:fil.nombre,cantidad}:null;}).filter(Boolean)}));}
+function updateEditPlateCosts(){
+  document.querySelectorAll('#ec-plate-rows .edit-print-plate').forEach(plate=>{const h=parseFloat(plate.querySelector('.plate-hours')?.value||0);const m=parseFloat(plate.querySelector('.plate-minutes')?.value||0);const duration=plate.querySelector('.plate-duration');if(duration)duration.value=formatDuration(h+m/60);plate.querySelectorAll('.edit-fil-row').forEach(row=>{const fil=D.filamentos.find(f=>f.id===calcFilamentId(row));const epg=fil&&fil.peso>0?fil.precio/fil.peso:0;const cost=epg*(parseFloat(row.querySelector('.ecf-g')?.value||0));const eg=row.querySelector('.ecf-eg');const ce=row.querySelector('.ecf-cost');if(eg)eg.value=fil?fmt4(epg)+' €/g':'—';if(ce)ce.value=fmt(cost);});});
+}
 function devolverStockPedidoSilencioso(item){
   (item.usosConsumibles||[]).forEach(u=>{
     const con=D.consumibles.find(c=>c.id===u.id)||D.consumibles.find(c=>c.nombre===u.nombre);if(!con)return;
@@ -1781,24 +1868,22 @@ function saveCatalogoEdit(id){
   const item=D.catalogo.find(c=>c.id===id);if(!item)return;
   const wasDiscounted=!!item.stockDescontado;
   if(wasDiscounted)devolverStockPedidoSilencioso(item);
-  const usosFilamentos=[],usosConsumibles=[],mats=[];let gramos=0,tFil=0,tCon=0;
-  document.querySelectorAll('#ec-fil-rows .edit-fil-row').forEach(row=>{
-    const fid=parseInt(row.querySelector('.ecf-sel')?.value||0);
-    const g=parseFloat(row.querySelector('.ecf-g')?.value||0);
-    const fil=D.filamentos.find(f=>f.id===fid);
-    if(fil&&g>0){usosFilamentos.push({id:fil.id,nombre:fil.nombre,cantidad:g});mats.push(fil.nombre);gramos+=g;tFil+=g*(fil.precio/fil.peso);}
-  });
+  const placas=calcEditPlateData();
+  const usosFilamentos=aggregateFilamentUses(placas.flatMap(p=>p.filamentos));
+  const usosConsumibles=[];const mats=[...new Set(usosFilamentos.map(u=>u.nombre))];
+  const gramos=usosFilamentos.reduce((total,u)=>total+(parseFloat(u.cantidad)||0),0);let tFil=0,tCon=0;
+  usosFilamentos.forEach(u=>{const fil=D.filamentos.find(f=>String(f.id)===String(u.id))||D.filamentos.find(f=>f.nombre===u.nombre);if(fil&&fil.peso>0)tFil+=u.cantidad*(fil.precio/fil.peso);});
   for(let i=0;i<3;i++){
     const cid=parseInt(document.getElementById(`ecc-sel-${i}`)?.value||0);
     const q=parseFloat(document.getElementById(`ecc-q-${i}`)?.value||0);
     const con=D.consumibles.find(c=>c.id===cid);
     if(con&&q>0){usosConsumibles.push({id:con.id,nombre:con.nombre,cantidad:q});tCon+=q*consumibleCosteUnidad(con);}
   }
-  const h=parseFloat(document.getElementById('ec-horas').value||0);
-  const min=parseFloat(document.getElementById('ec-minutos').value||0);
+  const totalHours=placas.reduce((total,p)=>total+p.horas+p.minutos/60,0);
+  const totalMinutes=Math.max(0,Math.round(totalHours*60));const h=Math.floor(totalMinutes/60);const min=totalMinutes%60;
   const w=parseFloat(document.getElementById('ec-watts').value||65);
   const k=parseFloat(document.getElementById('ec-kwh').value||0.18);
-  const coste=tFil+(h+min/60)*w/1000*k+tCon;
+  const coste=tFil+totalHours*w/1000*k+tCon;
   Object.assign(item,{
     nombre:document.getElementById('ec-nombre').value.trim()||item.nombre,
     cliente:document.getElementById('ec-cliente').value.trim(),
@@ -1807,7 +1892,7 @@ function saveCatalogoEdit(id){
     precioAcordado:parseFloat(document.getElementById('ec-precio').value)||'',
     horas:h,minutos:min,watts:w,kwh:k,
     notasInternas:document.getElementById('ec-notas-int').value.trim(),
-    materiales:mats.join(' + '),gramos:gramos.toFixed(1),tiempo:Math.floor(h)+'h '+Math.floor(min)+'min',
+    materiales:mats.join(' + '),gramos:gramos.toFixed(1),tiempo:`${h}h ${min}min`,placas,
     coste,precioCalc:coste*((D.multiplicadores[0]?.mult)||3),usosFilamentos,usosConsumibles
   });
   if(wasDiscounted)descontarStockPedido(item);
