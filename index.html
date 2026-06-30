@@ -77,6 +77,11 @@ textarea{resize:vertical;min-height:60px;}
 .form-row.cols2{grid-template-columns:1fr 1fr;}
 .form-row.cols3{grid-template-columns:1fr 1fr 1fr;}
 .form-row.cols4{grid-template-columns:1fr 1fr 1fr 1fr;}
+.filament-entry{display:grid;grid-template-columns:minmax(180px,1.5fr) minmax(90px,.7fr) minmax(90px,.7fr) minmax(100px,.8fr) 34px;gap:10px;align-items:end;margin-bottom:8px;}
+.filament-remove{width:34px;height:34px;padding:0;display:grid;place-items:center;}
+.filament-remove[hidden]{display:block;visibility:hidden;pointer-events:none;}
+.quick-actions{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:18px;}
+.quick-actions .btn{display:inline-flex;align-items:center;gap:6px;}
 .btn{padding:9px 18px;border-radius:8px;font-size:13px;font-weight:500;cursor:pointer;transition:all 0.15s;border:none;font-family:var(--sans);}
 .btn-primary{background:var(--accent);color:#fff;}
 .btn-primary:hover{background:var(--accent2);}
@@ -122,11 +127,6 @@ tr:hover td{background:var(--bg3);}
 .mult-x{font-family:var(--mono);color:var(--text3);width:16px;}
 .mult-price{font-family:var(--display);font-size:20px;font-weight:800;color:var(--green);letter-spacing:-0.5px;min-width:90px;text-align:right;}
 .mult-benefit{font-family:var(--mono);font-size:11px;color:var(--text3);min-width:80px;text-align:right;}
-.stock-bar-wrap{background:var(--bg4);border-radius:4px;height:6px;width:80px;display:inline-block;vertical-align:middle;margin-left:6px;}
-.stock-bar{height:6px;border-radius:4px;transition:width 0.3s;}
-.stock-ok{background:var(--green);}
-.stock-low{background:var(--amber);}
-.stock-empty{background:var(--red);}
 
 /* Kanban */
 .kanban{display:flex;gap:12px;overflow-x:auto;padding-bottom:8px;}
@@ -210,6 +210,9 @@ tr:hover td{background:var(--bg3);}
   .page-title{font-size:21px;margin-bottom:16px;line-height:1.2;}
   .card,.stat{border-radius:10px;padding:14px;margin-bottom:12px;}
   .grid2,.grid3,.grid4,.form-row.cols2,.form-row.cols3,.form-row.cols4,.orders-summary,.orders-layout{grid-template-columns:1fr!important;}
+  .filament-entry{grid-template-columns:1fr 1fr;}
+  .filament-entry>div:first-child{grid-column:1/-1;}
+  .filament-remove{grid-column:2;justify-self:end;}
   .form-row{gap:8px;margin-bottom:8px;}
   input[type=text],input[type=number],input[type=email],input[type=date],select,textarea{font-size:16px;padding:10px 12px;min-height:42px;}
   .btn{min-height:42px;padding:10px 14px;}
@@ -224,7 +227,6 @@ tr:hover td{background:var(--bg3);}
   .calc-total{align-items:flex-start;gap:8px;flex-direction:column;}
   .calc-total-val{font-size:24px;}
   .mult-price{min-width:auto;text-align:left;}
-  .stock-bar-wrap{width:62px;}
   #modal-box{width:calc(100vw - 24px);max-width:calc(100vw - 24px);padding:18px;border-radius:12px;}
   .notif{left:12px;right:12px;bottom:86px;max-width:none;}
   .save-status{top:10px;right:10px;}
@@ -259,7 +261,7 @@ tr:hover td{background:var(--bg3);}
     <div class="nav-section">Materiales</div>
     <div class="nav-item" data-page="filamentos" onclick="goTo(this)"><span class="nav-icon">🎨</span><span>Filamentos</span></div>
     <div class="nav-item" data-page="consumibles" onclick="goTo(this)"><span class="nav-icon">🔩</span><span>Consumibles</span></div>
-    <div class="nav-item" data-page="materiales" onclick="goTo(this)"><span class="nav-icon">🧰</span><span>Materiales</span></div>
+    <div class="nav-item" data-page="materiales" onclick="goTo(this)"><span class="nav-icon">🧰</span><span>Equipamiento</span></div>
     <div class="nav-section">Negocio</div>
     <div class="nav-item" data-page="catalogo" onclick="goTo(this)"><span class="nav-icon">📋</span><span>Catálogo</span></div>
     <div class="nav-item" data-page="pedidos" onclick="goTo(this)"><span class="nav-icon">📦</span><span>Pedidos</span></div>
@@ -279,11 +281,17 @@ tr:hover td{background:var(--bg3);}
 <!-- ══ DASHBOARD ══ -->
 <div id="page-dashboard" class="page active">
   <div class="page-title">Dashboard <span>/ resumen</span></div>
+  <div class="quick-actions">
+    <button class="btn btn-primary" onclick="navigateTo('calc')">+ Nuevo presupuesto</button>
+    <button class="btn btn-ghost" onclick="addFilamento()">+ Añadir filamento</button>
+    <button class="btn btn-ghost" onclick="reponerConsumible()">+ Reponer consumible</button>
+    <button class="btn btn-ghost" onclick="finalizarFilamento()">✓ Terminar bobina</button>
+  </div>
   <div class="grid4" style="margin-bottom:20px">
     <div class="stat"><div class="stat-label">Saldo actual</div><div class="stat-value" id="dash-saldo">0 €</div><div class="stat-sub" id="dash-saldo-sub">—</div></div>
     <div class="stat"><div class="stat-label">Pedidos activos</div><div class="stat-value accent" id="dash-activos">0</div><div class="stat-sub">en producción</div></div>
     <div class="stat"><div class="stat-label">Cobrado este mes</div><div class="stat-value green" id="dash-mes">0 €</div><div class="stat-sub" id="dash-mes-n">0 cobros</div></div>
-    <div class="stat"><div class="stat-label">Alertas stock</div><div class="stat-value amber" id="dash-stock-n">0</div><div class="stat-sub">filamentos bajos</div></div>
+    <div class="stat"><div class="stat-label">Consumibles bajos</div><div class="stat-value amber" id="dash-stock-n">0</div><div class="stat-sub">necesitan reposición</div></div>
   </div>
   <div class="grid2">
     <div class="card">
@@ -292,7 +300,7 @@ tr:hover td{background:var(--bg3);}
     </div>
     <div>
       <div class="card">
-        <div class="card-title">Alertas de stock</div>
+        <div class="card-title">Pendiente de atender</div>
         <div id="dash-alertas"></div>
       </div>
       <div class="card">
@@ -300,7 +308,7 @@ tr:hover td{background:var(--bg3);}
         <div id="dash-actividad"></div>
       </div>
       <div class="card">
-        <div class="card-title">Movimientos de stock</div>
+        <div class="card-title">Consumo de consumibles</div>
         <div id="dash-stock-movs"></div>
       </div>
     </div>
@@ -323,12 +331,12 @@ tr:hover td{background:var(--bg3);}
           <div><label>Entrega estimada</label><input type="date" id="c-entrega"></div>
           <div><label>Anticipo (€)</label><input type="number" id="c-anticipo" value="0" min="0" step="0.01"></div>
         </div>
-        <div class="form-row"><div><label>Notas para presupuesto</label><input type="text" id="c-notas-doc" placeholder="Color, acabado, condiciones..."></div></div>
         <div class="form-row"><div><label>Notas internas</label><input type="text" id="c-notas-internas" placeholder="Recordatorios tuyos, no salen en documentos..."></div></div>
       </div>
       <div class="card">
-        <div class="card-title">Filamentos (hasta 4)</div>
+        <div class="card-title">Filamentos</div>
         <div id="fil-rows"></div>
+        <button type="button" class="btn btn-ghost" onclick="addFilamentRow()">+ Añadir filamento</button>
       </div>
       <div class="card">
         <div class="card-title">Electricidad</div>
@@ -370,24 +378,28 @@ tr:hover td{background:var(--bg3);}
 
 <!-- ══ FILAMENTOS ══ -->
 <div id="page-filamentos" class="page">
-  <div class="page-title">Filamentos <span>/ stock</span></div>
+  <div class="page-title">Filamentos <span>/ bobinas</span></div>
   <div class="card">
     <div class="section-header">
-      <h2>Mis bobinas</h2>
+      <h2>Bobinas en uso</h2>
       <button class="btn btn-primary" onclick="addFilamento()">+ Añadir</button>
     </div>
     <div class="table-wrap">
       <table>
-        <thead><tr><th>Nombre</th><th>Material</th><th>Color</th><th>Marca</th><th>Proveedor</th><th>Precio</th><th>Peso</th><th>€/g</th><th>Stock (g)</th><th>Link</th><th></th></tr></thead>
+        <thead><tr><th>Nombre</th><th>Material</th><th>Color</th><th>Marca</th><th>Proveedor</th><th>Precio</th><th>Peso</th><th>€/g</th><th>Usado en pedidos</th><th>Link</th><th></th></tr></thead>
         <tbody id="fil-table"></tbody>
       </table>
     </div>
+  </div>
+  <div class="card">
+    <div class="card-title">Histórico de bobinas</div>
+    <div class="table-wrap"><table><thead><tr><th>Nombre</th><th>Material</th><th>Marca</th><th>Terminado</th><th>Usado en pedidos</th><th></th></tr></thead><tbody id="fil-history-table"></tbody></table></div>
   </div>
 </div>
 
 <!-- ══ CONSUMIBLES ══ -->
 <div id="page-consumibles" class="page">
-  <div class="page-title">Consumibles <span>/ accesorios</span></div>
+  <div class="page-title">Consumibles <span>/ unidades</span></div>
   <div class="card">
     <div class="section-header">
       <h2>Llaveros, imanes, etc.</h2>
@@ -395,28 +407,36 @@ tr:hover td{background:var(--bg3);}
     </div>
     <div class="table-wrap">
       <table>
-        <thead><tr><th>Nombre</th><th>Descripción</th><th>Uds pack</th><th>Precio pack</th><th>€/ud</th><th>Stock (uds)</th><th>Proveedor</th><th>Link</th><th></th></tr></thead>
+        <thead><tr><th>Nombre</th><th>Descripción</th><th>Coste medio</th><th>Stock</th><th>Proveedor</th><th>Link</th><th></th></tr></thead>
         <tbody id="con-table"></tbody>
       </table>
     </div>
   </div>
+  <div class="card">
+    <div class="card-title">Consumibles archivados</div>
+    <div class="table-wrap"><table><thead><tr><th>Nombre</th><th>Descripción</th><th>Stock final</th><th>Archivado</th><th></th></tr></thead><tbody id="con-history-table"></tbody></table></div>
+  </div>
 </div>
 
-<!-- ══ MATERIALES EXTRA ══ -->
+<!-- ══ EQUIPAMIENTO ══ -->
 <div id="page-materiales" class="page">
-  <div class="page-title">Materiales <span>/ herramientas y compras</span></div>
+  <div class="page-title">Equipamiento <span>/ accesorios y herramientas</span></div>
   <div class="card">
     <div class="section-header">
-      <h2>Herramientas, accesorios y extras</h2>
+      <h2>Equipamiento en uso</h2>
       <button class="btn btn-primary" onclick="addMaterialExtra()">+ Añadir</button>
     </div>
-    <div style="margin-bottom:14px"><input type="text" id="mat-search" placeholder="Buscar material, marca o tienda..." oninput="renderMaterialesExtra()" style="max-width:300px"></div>
+    <div style="margin-bottom:14px"><input type="text" id="mat-search" placeholder="Buscar equipo, marca o tienda..." oninput="renderMaterialesExtra()" style="max-width:300px"></div>
     <div class="table-wrap">
       <table>
-        <thead><tr><th>Nombre</th><th>Tipo</th><th>Marca</th><th>Compra</th><th>Cantidad</th><th>Precio</th><th>Unidad</th><th>Link</th><th></th></tr></thead>
+        <thead><tr><th>Nombre</th><th>Tipo</th><th>Marca</th><th>Compra</th><th>Cantidad</th><th>Precio</th><th>Link</th><th></th></tr></thead>
         <tbody id="mat-table"></tbody>
       </table>
     </div>
+  </div>
+  <div class="card">
+    <div class="card-title">Equipamiento retirado</div>
+    <div class="table-wrap"><table><thead><tr><th>Nombre</th><th>Tipo</th><th>Marca</th><th>Fecha de compra</th><th>Retirado</th><th></th></tr></thead><tbody id="mat-history-table"></tbody></table></div>
   </div>
 </div>
 
@@ -529,7 +549,7 @@ tr:hover td{background:var(--bg3);}
     </select>
     <select id="g-filter-origin" onchange="renderGastos()" style="width:170px">
       <option value="">Todos los orígenes</option>
-      <option>Manual</option><option>Filamentos</option><option>Consumibles</option><option>Materiales</option>
+      <option>Manual</option><option>Filamentos</option><option>Consumibles</option><option value="Materiales">Equipamiento</option>
     </select>
     <input type="text" id="g-filter-text" placeholder="Buscar gasto..." oninput="renderGastos()" style="max-width:260px">
   </div>
@@ -601,10 +621,9 @@ tr:hover td{background:var(--bg3);}
     </div>
     <div class="settings-section">
       <h3>Calculadora — valores por defecto</h3>
-      <div class="form-row cols3">
+      <div class="form-row cols2">
         <div><label>Consumo impresora (W)</label><input type="number" id="s-watts" value="65"></div>
         <div><label>Precio kWh (€)</label><input type="number" id="s-kwh" value="0.18" step="0.001"></div>
-        <div><label>Umbral alerta filamento (g)</label><input type="number" id="s-stock-alert" value="150"></div>
       </div>
     </div>
     <button class="btn btn-primary" onclick="saveSettings()">Guardar ajustes</button>
@@ -718,6 +737,9 @@ async function loadAllData() {
     if(stockMovsRow) D.stockMovs = stockMovsRow.valor||[];
     const materialesRow = confs.find(c => c.clave === 'materiales');
     if(materialesRow) D.materiales = materialesRow.valor||[];
+    D.filamentos.forEach(f=>{if(f.archivado===undefined)f.archivado=false;});
+    D.consumibles.forEach(c=>{if(c.stock===undefined)c.stock=c.uds;if(c.archivado===undefined)c.archivado=false;if(c.costeUnidad===undefined)c.costeUnidad=(parseFloat(c.precio)||0)/(parseFloat(c.uds)||1);});
+    D.materiales.forEach(m=>{if(m.archivado===undefined)m.archivado=false;});
     
     // Sync nextIds
     D.nextId.fil = D.filamentos.length ? Math.max(...D.filamentos.map(f=>f.id||0)) + 1 : 1;
@@ -797,7 +819,7 @@ const DEF = {
   ],
   catalogo:[],gastos:[],cobros:[],actividad:[],stockMovs:[],materiales:[],
   multiplicadores:[{mult:2,label:"x2 — Básico"},{mult:3,label:"x3 — Recomendado"},{mult:4,label:"x4 — Feria"}],
-  settings:{nombre:"Kurin Lab",sub:"CREATE · TEST · EVOLVE",watts:65,kwh:0.18,stockAlert:150,logo:""},
+  settings:{nombre:"Kurin Lab",sub:"CREATE · TEST · EVOLVE",watts:65,kwh:0.18,logo:""},
   nextId:{fil:6,con:3,cat:1,gasto:1,mat:1}
 };
 
@@ -808,8 +830,9 @@ if(!D.materiales) D.materiales=[];
 if(!D.settings) D.settings=JSON.parse(JSON.stringify(DEF.settings));
 if(!D.settings.logo) D.settings.logo="";
 D.catalogo.forEach(c=>{c.estado=normalizeEstado(c.estado);});
-D.filamentos.forEach(f=>{if(f.stock===undefined)f.stock=f.peso;});
-D.consumibles.forEach(c=>{if(c.stock===undefined)c.stock=c.uds;});
+D.filamentos.forEach(f=>{if(f.archivado===undefined)f.archivado=false;});
+D.consumibles.forEach(c=>{if(c.stock===undefined)c.stock=c.uds;if(c.archivado===undefined)c.archivado=false;if(c.costeUnidad===undefined)c.costeUnidad=(parseFloat(c.precio)||0)/(parseFloat(c.uds)||1);});
+D.materiales.forEach(m=>{if(m.archivado===undefined)m.archivado=false;});
 
 
 async function connectManualKey() {
@@ -995,10 +1018,8 @@ function limpiarGastosMaterialesHuerfanos(){
   }
   return before-D.gastos.length;
 }
-function stockColor(pct){if(pct>40)return'stock-ok';if(pct>15)return'stock-low';return'stock-empty';}
-function stockPct(f){return Math.min(100,Math.round((f.stock/f.peso)*100));}
 function notifyLowConsumibles(items){
-  const low=items.filter(c=>(parseFloat(c.stock)||0)<5);
+  const low=items.filter(c=>!c.archivado&&(parseFloat(c.stock)||0)<5);
   if(low.length) notify('Stock bajo: '+low.map(c=>`${c.nombre} (${c.stock||0})`).join(', '),'error');
 }
 function addStockMov(tipo,item,cantidad,producto){
@@ -1066,12 +1087,10 @@ function renderDashboard(){
   document.getElementById('dash-mes').textContent=fmt(totalMes);
   document.getElementById('dash-mes-n').textContent=cobrosMes.length+' cobros';
 
-  const alert=D.settings.stockAlert||150;
-  const bajos=D.filamentos.filter(f=>f.stock<=alert);
-  const conBajos=D.consumibles.filter(c=>(parseFloat(c.stock)||0)<5);
+  const conBajos=D.consumibles.filter(c=>!c.archivado&&(parseFloat(c.stock)||0)<5);
   const listos=D.catalogo.filter(c=>normalizeEstado(c.estado)==='Listo');
   const entregados=D.catalogo.filter(c=>normalizeEstado(c.estado)==='Entregado');
-  document.getElementById('dash-stock-n').textContent=bajos.length+conBajos.length;
+  document.getElementById('dash-stock-n').textContent=conBajos.length;
 
   // Pedidos activos
   const dpEl=document.getElementById('dash-pedidos');
@@ -1089,10 +1108,7 @@ function renderDashboard(){
 
   // Alertas stock
   const daEl=document.getElementById('dash-alertas');
-  const stockAlerts=[
-    ...bajos.map(f=>({tipo:'Filamento',nombre:f.nombre,restante:`${f.stock}g`,urgente:stockPct(f)<=15})),
-    ...conBajos.map(c=>({tipo:'Consumible',nombre:c.nombre,restante:`${c.stock||0} uds`,urgente:true}))
-  ];
+  const stockAlerts=conBajos.map(c=>({tipo:'Consumible',nombre:c.nombre,restante:`${c.stock||0} uds`,urgente:true,page:'consumibles'}));
   const orderAlerts=[
     ...listos.map(c=>({txt:`Listo para entregar: ${c.nombre}`,sub:c.cliente||'Sin cliente',page:'pedidos'})),
     ...entregados.map(c=>({txt:`Entregado pendiente de cobrar: ${c.nombre}`,sub:fmt(pedidoIngreso(c)),page:'pedidos'}))
@@ -1104,6 +1120,7 @@ function renderDashboard(){
         <span style="font-size:13px;color:var(--text)">${a.nombre}</span>
         <div style="font-size:11px;color:var(--text3);font-family:var(--mono)">${a.tipo} · ${a.restante}</div>
       </div>
+      <button class="btn btn-ghost" style="padding:5px 9px;font-size:11px" onclick="navigateTo('${a.page}')">Ir</button>
     </div>`),
     ...orderAlerts.map(a=>`<div class="alert-item">
       <div class="alert-dot" style="background:var(--green)"></div>
@@ -1114,7 +1131,7 @@ function renderDashboard(){
       <button class="btn btn-ghost" style="padding:5px 9px;font-size:11px" onclick="navigateTo('${a.page}')">Ir</button>
     </div>`)
   ].join('')
-  :'<div class="empty"><p>Todo el stock está bien</p></div>';
+  :'<div class="empty"><p>No hay nada pendiente</p></div>';
 
   // Actividad
   const daEl2=document.getElementById('dash-actividad');
@@ -1131,12 +1148,12 @@ function renderDashboard(){
       </div>
     </div>`).join('')||'<div class="empty"><p>Sin actividad reciente</p></div>';
   const smEl=document.getElementById('dash-stock-movs');
-  smEl.innerHTML=(D.stockMovs||[]).slice(0,6).map(m=>`
+  smEl.innerHTML=(D.stockMovs||[]).filter(m=>m.tipo==='Consumible').slice(0,6).map(m=>`
     <div class="dash-activity">
       <div class="dash-activity-dot" style="background:${m.tipo==='Consumible'?'var(--amber)':'var(--accent)'}"></div>
       <div style="flex:1">
-        <div class="dash-activity-text">${m.nombre} -${m.cantidad}${m.tipo==='Consumible'?' ud':'g'}</div>
-        <div class="dash-activity-time">${m.producto} · quedan ${m.restante}${m.tipo==='Consumible'?' ud':'g'}</div>
+        <div class="dash-activity-text">${m.nombre} ${m.cantidad>=0?'-':'+'}${Math.abs(m.cantidad)} ud</div>
+        <div class="dash-activity-time">${m.producto} · quedan ${m.restante} ud</div>
       </div>
     </div>`).join('')||'<div class="empty"><p>Sin movimientos todavía.</p></div>';
 }
@@ -1152,19 +1169,39 @@ function initCalc(){
 }
 function renderFilRows(){
   const el=document.getElementById('fil-rows');el.innerHTML='';
-  const opts=D.filamentos.map(f=>`<option value="${f.id}">${f.nombre}</option>`).join('');
-  for(let i=0;i<4;i++){
-    el.innerHTML+=`<div class="form-row cols4" style="margin-bottom:8px">
-      <div><label>Filamento ${i+1}</label><select id="cf-sel-${i}" onchange="calcular()"><option value="">— Ninguno —</option>${opts}</select></div>
-      <div><label>Gramos</label><input type="number" id="cf-g-${i}" value="${i===0?15:0}" min="0" step="0.1" oninput="calcular()"></div>
-      <div><label>€/g</label><input type="text" id="cf-eg-${i}" readonly style="color:var(--text3)"></div>
-      <div><label>Coste</label><input type="text" id="cf-c-${i}" readonly style="color:var(--green)"></div>
-    </div>`;
-  }
+  addFilamentRow({gramos:15});
+}
+function addFilamentRow(values={}){
+  const el=document.getElementById('fil-rows');if(!el)return;
+  const opts=D.filamentos.filter(f=>!f.archivado).map(f=>`<option value="${f.id}">${f.nombre}</option>`).join('');
+  const row=document.createElement('div');row.className='filament-entry calc-fil-row';
+  row.innerHTML=`<div><label class="filament-label">Filamento</label><select class="cf-sel" onchange="calcular()"><option value="">— Ninguno —</option>${opts}</select></div>
+    <div><label>Gramos</label><input class="cf-g" type="number" value="${values.gramos??0}" min="0" step="0.1" oninput="calcular()"></div>
+    <div><label>€/g</label><input class="cf-eg" type="text" readonly style="color:var(--text3)"></div>
+    <div><label>Coste</label><input class="cf-c" type="text" readonly style="color:var(--green)"></div>
+    <button type="button" class="btn btn-ghost filament-remove" title="Quitar filamento" onclick="removeFilamentRow(this)">×</button>`;
+  el.appendChild(row);
+  if(values.filamentoId)row.querySelector('.cf-sel').value=values.filamentoId;
+  syncFilamentRows();calcular();
+}
+function removeFilamentRow(button){
+  const rows=document.querySelectorAll('#fil-rows .calc-fil-row');if(rows.length<=1)return;
+  button.closest('.calc-fil-row')?.remove();syncFilamentRows();calcular();
+}
+function syncFilamentRows(){
+  const rows=[...document.querySelectorAll('#fil-rows .calc-fil-row')];
+  rows.forEach((row,i)=>{row.querySelector('.filament-label').textContent=`Filamento ${i+1}`;row.querySelector('.filament-remove').hidden=rows.length===1;});
+}
+function calcFilamentUses(){
+  return [...document.querySelectorAll('#fil-rows .calc-fil-row')].map(row=>{
+    const fid=parseInt(row.querySelector('.cf-sel')?.value||0);
+    const cantidad=parseFloat(row.querySelector('.cf-g')?.value||0);
+    return {filamento:D.filamentos.find(f=>f.id===fid),cantidad};
+  }).filter(u=>u.filamento&&u.cantidad>0);
 }
 function renderConRows(){
   const el=document.getElementById('con-rows');el.innerHTML='';
-  const opts=D.consumibles.map(c=>`<option value="${c.id}">${c.nombre}</option>`).join('');
+  const opts=D.consumibles.filter(c=>!c.archivado).map(c=>`<option value="${c.id}">${c.nombre}</option>`).join('');
   for(let i=0;i<3;i++){
     el.innerHTML+=`<div class="form-row cols3" style="margin-bottom:8px">
       <div><label>Consumible ${i+1}</label><select id="cc-sel-${i}" onchange="calcular()"><option value="">— Ninguno —</option>${opts}</select></div>
@@ -1199,24 +1236,23 @@ function calcular(){
   const k=parseFloat(document.getElementById('c-kwh')?.value||0.18);
   const elec=th*w/1000*k;
   let tFil=0;
-  for(let i=0;i<4;i++){
-    const sel=document.getElementById(`cf-sel-${i}`);const gEl=document.getElementById(`cf-g-${i}`);
-    if(!sel)continue;
-    const fid=parseInt(sel.value);const g=parseFloat(gEl?.value||0);
+  document.querySelectorAll('#fil-rows .calc-fil-row').forEach(row=>{
+    const sel=row.querySelector('.cf-sel');const gEl=row.querySelector('.cf-g');
+    const fid=parseInt(sel?.value||0);const g=parseFloat(gEl?.value||0);
     const fil=D.filamentos.find(f=>f.id===fid);
     const epg=fil&&fil.peso>0?fil.precio/fil.peso:0;
     const cost=g*epg;tFil+=cost;
-    const egEl=document.getElementById(`cf-eg-${i}`);const ccEl=document.getElementById(`cf-c-${i}`);
+    const egEl=row.querySelector('.cf-eg');const ccEl=row.querySelector('.cf-c');
     if(egEl)egEl.value=fil?fmt4(epg)+' €/g':'—';
     if(ccEl)ccEl.value=fmt(cost);
-  }
+  });
   let tCon=0;
   for(let i=0;i<3;i++){
     const sel=document.getElementById(`cc-sel-${i}`);const qEl=document.getElementById(`cc-q-${i}`);
     if(!sel)continue;
     const cid=parseInt(sel.value);const q=parseFloat(qEl?.value||0);
     const con=D.consumibles.find(c=>c.id===cid);
-    const epu=con&&con.uds>0?con.precio/con.uds:0;
+    const epu=con?consumibleCosteUnidad(con):0;
     const cost=q*epu;tCon+=cost;
     const ccEl=document.getElementById(`cc-c-${i}`);
     if(ccEl)ccEl.value=fmt(cost);
@@ -1235,15 +1271,11 @@ function calcular(){
   }
 }
 function limpiarCalculadora(){
-  ['c-nombre','c-cliente','c-contacto','c-entrega','c-notas-doc','c-notas-internas'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  ['c-nombre','c-cliente','c-contacto','c-entrega','c-notas-internas'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
   const anticipo=document.getElementById('c-anticipo');if(anticipo)anticipo.value='0';
   const horas=document.getElementById('c-horas');if(horas)horas.value='1';
   const minutos=document.getElementById('c-minutos');if(minutos)minutos.value='30';
-  for(let i=0;i<4;i++){
-    const sel=document.getElementById(`cf-sel-${i}`);const g=document.getElementById(`cf-g-${i}`);
-    if(sel)sel.value='';
-    if(g)g.value='0';
-  }
+  renderFilRows();
   for(let i=0;i<3;i++){
     const sel=document.getElementById(`cc-sel-${i}`);const q=document.getElementById(`cc-q-${i}`);
     if(sel)sel.value='';
@@ -1253,17 +1285,7 @@ function limpiarCalculadora(){
 }
 function descontarStockPedido(item){
   if(item.stockDescontado)return;
-  const totalUsos=(item.usosFilamentos||[]).length+(item.usosConsumibles||[]).length;
-  if(!totalUsos&&!confirm('Este pedido no tiene materiales ni consumibles registrados. ¿Aceptarlo igualmente?'))return false;
   const lowConsumibles=[];
-  (item.usosFilamentos||[]).forEach(u=>{
-    const fil=D.filamentos.find(f=>f.id===u.id)||D.filamentos.find(f=>f.nombre===u.nombre);
-    if(!fil)return;
-    const cantidad=parseFloat(u.cantidad)||0;
-    fil.stock=Math.max(0,(fil.stock||0)-cantidad);
-    addStockMov('Filamento',fil,cantidad,item.nombre);
-    if(fil._sbid)saveToSupabase('filamentos',fil,fil._sbid);
-  });
   (item.usosConsumibles||[]).forEach(u=>{
     const con=D.consumibles.find(c=>c.id===u.id)||D.consumibles.find(c=>c.nombre===u.nombre);
     if(!con)return;
@@ -1273,7 +1295,7 @@ function descontarStockPedido(item){
     lowConsumibles.push(con);
     if(con._sbid)saveToSupabase('consumibles',con,con._sbid);
   });
-  item.stockDescontado=true;
+  item.stockDescontado=(item.usosConsumibles||[]).length>0;
   notifyLowConsumibles(lowConsumibles);
   queueConfigSave('stockMovs');
   return true;
@@ -1281,15 +1303,7 @@ function descontarStockPedido(item){
 function revertirStockPedido(id){
   const item=D.catalogo.find(c=>c.id===id);if(!item)return;
   if(!item.stockDescontado){notify('Este pedido no tiene stock descontado','error');return;}
-  if(!confirm('¿Devolver al stock los materiales de este pedido?'))return;
-  (item.usosFilamentos||[]).forEach(u=>{
-    const fil=D.filamentos.find(f=>f.id===u.id)||D.filamentos.find(f=>f.nombre===u.nombre);
-    if(!fil)return;
-    const cantidad=parseFloat(u.cantidad)||0;
-    fil.stock=(parseFloat(fil.stock)||0)+cantidad;
-    addStockMov('Filamento',fil,-cantidad,item.nombre+' (revertido)');
-    if(fil._sbid)saveToSupabase('filamentos',fil,fil._sbid);
-  });
+  if(!confirm('¿Devolver al stock los consumibles de este pedido?'))return;
   (item.usosConsumibles||[]).forEach(u=>{
     const con=D.consumibles.find(c=>c.id===u.id)||D.consumibles.find(c=>c.nombre===u.nombre);
     if(!con)return;
@@ -1300,7 +1314,7 @@ function revertirStockPedido(id){
   });
   item.stockDescontado=false;
   if(item._sbid)saveToSupabase('catalogo',item,item._sbid);
-  save();queueConfigSave('stockMovs');refreshCatalogoViews();notify('Stock devuelto');
+  save();queueConfigSave('stockMovs');refreshCatalogoViews();notify('Consumibles devueltos');
 }
 function guardarEnCatalogo(){
   const nombre=document.getElementById('c-nombre').value.trim();
@@ -1310,23 +1324,12 @@ function guardarEnCatalogo(){
   const contacto=document.getElementById('c-contacto').value.trim();
   const entrega=dateInputValue('c-entrega').trim();
   const anticipo=parseFloat(document.getElementById('c-anticipo').value)||0;
-  const notasDoc=document.getElementById('c-notas-doc').value.trim();
   const notasInternas=document.getElementById('c-notas-internas').value.trim();
-  let mats=[],gramos=0;
-  for(let i=0;i<4;i++){
-    const sel=document.getElementById(`cf-sel-${i}`);const gEl=document.getElementById(`cf-g-${i}`);
-    const fid=parseInt(sel?.value||0);const g=parseFloat(gEl?.value||0);
-    const fil=D.filamentos.find(f=>f.id===fid);
-    if(fil&&g>0){mats.push(fil.nombre);gramos+=g;}
-  }
-  const usosFilamentos=[];
+  const calcFilamentos=calcFilamentUses();
+  const mats=calcFilamentos.map(u=>u.filamento.nombre);
+  const gramos=calcFilamentos.reduce((total,u)=>total+u.cantidad,0);
+  const usosFilamentos=calcFilamentos.map(u=>({id:u.filamento.id,nombre:u.filamento.nombre,cantidad:u.cantidad}));
   const usosConsumibles=[];
-  for(let i=0;i<4;i++){
-    const sel=document.getElementById(`cf-sel-${i}`);const gEl=document.getElementById(`cf-g-${i}`);
-    const fid=parseInt(sel?.value||0);const g=parseFloat(gEl?.value||0);
-    const fil=D.filamentos.find(f=>f.id===fid);
-    if(fil&&g>0)usosFilamentos.push({id:fil.id,nombre:fil.nombre,cantidad:g});
-  }
   // Registrar consumibles previstos
   for(let i=0;i<3;i++){
     const sel=document.getElementById(`cc-sel-${i}`);const qEl=document.getElementById(`cc-q-${i}`);
@@ -1340,12 +1343,12 @@ function guardarEnCatalogo(){
   const w=parseFloat(document.getElementById('c-watts').value||65);
   const k=parseFloat(document.getElementById('c-kwh').value||0.18);
   let tFil=0,tCon=0;
-  for(let i=0;i<4;i++){const sel=document.getElementById(`cf-sel-${i}`);const gEl=document.getElementById(`cf-g-${i}`);const fid=parseInt(sel?.value||0);const g=parseFloat(gEl?.value||0);const fil=D.filamentos.find(f=>f.id===fid);if(fil&&g>0)tFil+=g*(fil.precio/fil.peso);}
-  for(let i=0;i<3;i++){const sel=document.getElementById(`cc-sel-${i}`);const qEl=document.getElementById(`cc-q-${i}`);const cid=parseInt(sel?.value||0);const q=parseFloat(qEl?.value||0);const con=D.consumibles.find(c=>c.id===cid);if(con&&q>0)tCon+=q*(con.precio/con.uds);}
+  calcFilamentos.forEach(u=>{tFil+=u.cantidad*(u.filamento.precio/u.filamento.peso);});
+  for(let i=0;i<3;i++){const sel=document.getElementById(`cc-sel-${i}`);const qEl=document.getElementById(`cc-q-${i}`);const cid=parseInt(sel?.value||0);const q=parseFloat(qEl?.value||0);const con=D.consumibles.find(c=>c.id===cid);if(con&&q>0)tCon+=q*consumibleCosteUnidad(con);}
   const total=tFil+th*w/1000*k+tCon;
   const mRef=D.multiplicadores[0];
   const precioCalc=total*(mRef?.mult||3);
-  const item={id:D.nextId.cat++,nombre,cliente,contacto,entrega,anticipo,notasDoc,notasInternas,materiales:mats.join(' + '),gramos:gramos.toFixed(1),tiempo:Math.floor(h)+'h '+Math.floor(min)+'min',coste:total,precioCalc,precioAcordado:'',estado:'Presupuesto',fecha:today(),fechaCobro:'',notas:'',usosFilamentos,usosConsumibles,stockDescontado:false};
+  const item={id:D.nextId.cat++,nombre,cliente,contacto,entrega,anticipo,notasInternas,materiales:mats.join(' + '),gramos:gramos.toFixed(1),tiempo:Math.floor(h)+'h '+Math.floor(min)+'min',coste:total,precioCalc,precioAcordado:'',estado:'Presupuesto',fecha:today(),fechaCobro:'',notas:'',usosFilamentos,usosConsumibles,stockDescontado:false};
   D.catalogo.push(item);
   saveToSupabase('catalogo',item);
   addActividad(`Presupuesto guardado: ${nombre}`,{tipo:'guardar',refType:'catalogo',refId:item.id});
@@ -1358,33 +1361,35 @@ function guardarEnCatalogo(){
 // ══════════════════════════════════════════════════════
 function renderFilamentos(){
   const tbody=document.getElementById('fil-table');
-  if(!D.filamentos.length){tbody.innerHTML='<tr><td colspan="11"><div class="empty"><p>No hay filamentos. Añade el primero.</p></div></td></tr>';return;}
-  tbody.innerHTML=D.filamentos.map(f=>{
-    const pct=stockPct(f);
-    const sc=stockColor(pct);
-    return`<tr>
+  const activos=D.filamentos.filter(f=>!f.archivado);
+  const historicos=D.filamentos.filter(f=>f.archivado);
+  tbody.innerHTML=activos.map(f=>`<tr>
       <td class="td-main">${f.nombre}</td>
       <td><span class="badge badge-purple">${f.material}</span></td>
       <td>${f.color}</td><td>${f.marca||'—'}</td><td>${f.proveedor||'—'}</td>
       <td class="td-mono">${fmt(f.precio)}</td>
       <td class="td-mono">${f.peso}g</td>
       <td class="td-mono" style="color:var(--accent2)">${fmt4(f.precio/f.peso)}€/g</td>
-      <td>
-        <div style="display:flex;align-items:center;gap:6px">
-          <input type="number" value="${f.stock||0}" min="0" step="10" style="width:70px;padding:4px 7px;font-size:12px;font-family:var(--mono)" onchange="updateStock('fil',${f.id},this.value)">
-          <div class="stock-bar-wrap"><div class="stock-bar ${sc}" style="width:${pct}%"></div></div>
-        </div>
-      </td>
+      <td class="td-mono" style="color:var(--green)">${filamentoGramosPedidos(f).toFixed(1)}g</td>
       <td>${f.link?`<a href="${f.link}" target="_blank" style="color:var(--blue);font-size:12px">🔗</a>`:'—'}</td>
       <td style="white-space:nowrap">
         <button class="action-btn edit" onclick="editFilamento(${f.id})">✏</button>
-        <button class="action-btn" onclick="delFilamento(${f.id})">✕</button>
+        <button class="btn btn-ghost" style="padding:5px 9px;font-size:11px" onclick="finalizarFilamento(${f.id})">Terminar</button>
       </td>
-    </tr>`;}).join('');
+    </tr>`).join('')||'<tr><td colspan="11"><div class="empty"><p>No hay bobinas en uso.</p></div></td></tr>';
+  const history=document.getElementById('fil-history-table');
+  history.innerHTML=historicos.slice().reverse().map(f=>`<tr>
+    <td class="td-main">${f.nombre}</td><td>${f.material||'—'}</td><td>${f.marca||'—'}</td>
+    <td class="td-mono">${f.fechaRetirada||'—'}</td>
+    <td class="td-mono">${filamentoGramosPedidos(f).toFixed(1)}g</td>
+    <td><button class="btn btn-ghost" style="padding:5px 9px;font-size:11px" onclick="reactivarFilamento(${f.id})">Reactivar</button> <button class="action-btn" onclick="delFilamento(${f.id})">✕</button></td>
+  </tr>`).join('')||'<tr><td colspan="6"><div class="empty"><p>Todavía no hay bobinas terminadas.</p></div></td></tr>';
 }
 function updateStock(type,id,val){
-  if(type==='fil'){const f=D.filamentos.find(x=>x.id===id);if(f){f.stock=parseFloat(val)||0;if(f._sbid)saveToSupabase('filamentos',f,f._sbid);save();renderFilamentos();}}
-  else{const c=D.consumibles.find(x=>x.id===id);if(c){c.stock=parseFloat(val)||0;if(c._sbid)saveToSupabase('consumibles',c,c._sbid);save();renderConsumibles();notifyLowConsumibles([c]);}}
+  const c=D.consumibles.find(x=>x.id===id);if(c){c.stock=parseFloat(val)||0;if(c._sbid)saveToSupabase('consumibles',c,c._sbid);save();renderConsumibles();notifyLowConsumibles([c]);}
+}
+function filamentoGramosPedidos(f){
+  return D.catalogo.filter(p=>!['Presupuesto','Cancelado'].includes(normalizeEstado(p.estado))).reduce((total,p)=>total+(p.usosFilamentos||[]).filter(u=>String(u.id)===String(f.id)||(!u.id&&u.nombre===f.nombre)).reduce((s,u)=>s+(parseFloat(u.cantidad)||0),0),0);
 }
 function addFilamento(){
   openModal(`<div style="font-family:var(--display);font-size:17px;font-weight:800;margin-bottom:18px">Nuevo filamento</div>
@@ -1400,10 +1405,9 @@ function addFilamento(){
       <div><label>Proveedor</label><input type="text" id="mf-prov" placeholder="Amazon..."></div>
       <div><label>Link de compra</label><input type="text" id="mf-link" placeholder="https://..."></div>
     </div>
-    <div class="form-row cols3">
+    <div class="form-row cols2">
       <div><label>Precio bobina (€)</label><input type="number" id="mf-precio" value="19.99" step="0.01"></div>
       <div><label>Peso bobina (g)</label><input type="number" id="mf-peso" value="1000"></div>
-      <div><label>Stock actual (g)</label><input type="number" id="mf-stock" value="1000"></div>
     </div>
     <div style="display:flex;gap:8px;margin-top:10px">
       <button class="btn btn-primary" style="flex:1" onclick="saveFilamento()">Guardar</button>
@@ -1411,7 +1415,8 @@ function addFilamento(){
     </div>`);
 }
 function saveFilamento(id){
-  const f={id:id||D.nextId.fil++,nombre:document.getElementById('mf-nombre').value.trim(),material:document.getElementById('mf-mat').value,color:document.getElementById('mf-color').value.trim(),marca:document.getElementById('mf-marca').value,proveedor:document.getElementById('mf-prov').value.trim(),link:document.getElementById('mf-link').value.trim(),precio:parseFloat(document.getElementById('mf-precio').value)||0,peso:parseFloat(document.getElementById('mf-peso').value)||1000,stock:parseFloat(document.getElementById('mf-stock').value)||0};
+  const old=id?D.filamentos.find(x=>x.id===id):null;
+  const f={...(old||{}),id:id||D.nextId.fil++,nombre:document.getElementById('mf-nombre').value.trim(),material:document.getElementById('mf-mat').value,color:document.getElementById('mf-color').value.trim(),marca:document.getElementById('mf-marca').value,proveedor:document.getElementById('mf-prov').value.trim(),link:document.getElementById('mf-link').value.trim(),precio:parseFloat(document.getElementById('mf-precio').value)||0,peso:parseFloat(document.getElementById('mf-peso').value)||1000,archivado:old?.archivado||false};
   if(!f.nombre){notify('El nombre es obligatorio','error');return;}
   if(id){
     const i=D.filamentos.findIndex(x=>x.id===id);
@@ -1443,47 +1448,59 @@ function editFilamento(id){
       <div><label>Proveedor</label><input type="text" id="mf-prov" value="${f.proveedor||''}"></div>
       <div><label>Link</label><input type="text" id="mf-link" value="${f.link||''}"></div>
     </div>
-    <div class="form-row cols3">
+    <div class="form-row cols2">
       <div><label>Precio (€)</label><input type="number" id="mf-precio" value="${f.precio}" step="0.01"></div>
       <div><label>Peso (g)</label><input type="number" id="mf-peso" value="${f.peso}"></div>
-      <div><label>Stock (g)</label><input type="number" id="mf-stock" value="${f.stock||0}"></div>
     </div>
     <div style="display:flex;gap:8px;margin-top:10px">
       <button class="btn btn-primary" style="flex:1" onclick="saveFilamento(${id})">Guardar cambios</button>
       <button class="btn btn-ghost" onclick="closeModal()">Cancelar</button>
     </div>`);
 }
-function delFilamento(id){if(!confirm('¿Borrar? También se quitará del Balance el gasto vinculado a este filamento.'))return;const f=D.filamentos.find(x=>x.id===id);if(f&&f._sbid)deleteFromSupabase('filamentos',f._sbid);const n=borrarGastosVinculados('filamento',f);limpiarActividad('filamento',id,f?.nombre);D.filamentos=D.filamentos.filter(f=>f.id!==id);save();renderFilamentos();if(document.getElementById('page-balance')?.classList.contains('active'))renderBalance();notify('Filamento eliminado'+(n?' y gasto quitado del balance':''));}
+function finalizarFilamento(id){
+  const activos=D.filamentos.filter(f=>!f.archivado);if(!activos.length){notify('No hay bobinas activas','error');return;}
+  openModal(`<div style="font-family:var(--display);font-size:17px;font-weight:800;margin-bottom:18px">Terminar bobina</div>
+    <div class="form-row"><div><label>Bobina</label><select id="ff-id">${activos.map(f=>`<option value="${f.id}"${String(f.id)===String(id)?' selected':''}>${f.nombre}</option>`).join('')}</select></div></div>
+    <div class="form-row"><div><label>Fecha de finalización</label><input type="date" id="ff-fecha" value="${displayDateToInput(today())}"></div></div>
+    <div style="display:flex;gap:8px"><button class="btn btn-primary" style="flex:1" onclick="saveFinalizarFilamento()">Guardar en histórico</button><button class="btn btn-ghost" onclick="closeModal()">Cancelar</button></div>`);
+}
+function saveFinalizarFilamento(){
+  const f=D.filamentos.find(x=>String(x.id)===document.getElementById('ff-id').value);if(!f)return;
+  f.archivado=true;f.fechaRetirada=dateInputValue('ff-fecha')||today();delete f.motivoRetirada;
+  if(f._sbid)saveToSupabase('filamentos',f,f._sbid);save();closeModal();renderFilamentos();renderDashboard();notify('Bobina guardada en el histórico');
+}
+function reactivarFilamento(id){const f=D.filamentos.find(x=>x.id===id);if(!f)return;f.archivado=false;f.fechaRetirada='';delete f.motivoRetirada;if(f._sbid)saveToSupabase('filamentos',f,f._sbid);save();renderFilamentos();notify('Bobina reactivada');}
+function delFilamento(id){if(!confirm('¿Eliminar definitivamente esta bobina y su gasto?'))return;const f=D.filamentos.find(x=>x.id===id);if(f&&f._sbid)deleteFromSupabase('filamentos',f._sbid);const n=borrarGastosVinculados('filamento',f);limpiarActividad('filamento',id,f?.nombre);D.filamentos=D.filamentos.filter(f=>f.id!==id);save();renderFilamentos();if(document.getElementById('page-balance')?.classList.contains('active'))renderBalance();notify('Filamento eliminado'+(n?' y gasto quitado del balance':''));}
 
 // ══════════════════════════════════════════════════════
 // CONSUMIBLES
 // ══════════════════════════════════════════════════════
 function renderConsumibles(){
   const tbody=document.getElementById('con-table');
-  if(!D.consumibles.length){tbody.innerHTML='<tr><td colspan="9"><div class="empty"><p>No hay consumibles.</p></div></td></tr>';return;}
-  tbody.innerHTML=D.consumibles.map(c=>{
-    const pct=Math.min(100,Math.round((c.stock/c.uds)*100));
-    const sc=stockColor(pct);
+  const activos=D.consumibles.filter(c=>!c.archivado);
+  const historicos=D.consumibles.filter(c=>c.archivado);
+  tbody.innerHTML=activos.map(c=>{
     const low=(parseFloat(c.stock)||0)<5;
     return`<tr>
       <td class="td-main">${c.nombre}${low?` <span class="badge badge-red" style="margin-left:6px">bajo</span>`:''}</td><td>${c.desc||'—'}</td>
-      <td class="td-mono">${c.uds}uds</td>
-      <td class="td-mono">${fmt(c.precio)}</td>
-      <td class="td-mono" style="color:var(--accent2)">${fmt(c.precio/c.uds)}/ud</td>
+      <td class="td-mono" style="color:var(--accent2)">${fmt(consumibleCosteUnidad(c))}/ud</td>
       <td>
         <div style="display:flex;align-items:center;gap:6px">
           <input type="number" value="${c.stock||0}" min="0" style="width:65px;padding:4px 7px;font-size:12px;font-family:var(--mono);${low?'border-color:var(--red);color:var(--red)':''}" onchange="updateStock('con',${c.id},this.value)">
-          <div class="stock-bar-wrap"><div class="stock-bar ${sc}" style="width:${pct}%"></div></div>
         </div>
       </td>
       <td>${c.proveedor||'—'}</td>
       <td>${c.link?`<a href="${c.link}" target="_blank" style="color:var(--blue);font-size:12px">🔗</a>`:'—'}</td>
       <td style="white-space:nowrap">
+        <button class="btn btn-primary" style="padding:5px 9px;font-size:11px" onclick="reponerConsumible(${c.id})">Reponer</button>
         <button class="action-btn edit" onclick="editConsumible(${c.id})">✏</button>
-        <button class="action-btn" onclick="delConsumible(${c.id})">✕</button>
+        <button class="btn btn-ghost" style="padding:5px 9px;font-size:11px" onclick="archivarConsumible(${c.id})">Archivar</button>
       </td>
-    </tr>`;}).join('');
+    </tr>`;}).join('')||'<tr><td colspan="7"><div class="empty"><p>No hay consumibles activos.</p></div></td></tr>';
+  const history=document.getElementById('con-history-table');
+  history.innerHTML=historicos.slice().reverse().map(c=>`<tr><td class="td-main">${c.nombre}</td><td>${c.desc||'—'}</td><td class="td-mono">${c.stock||0} uds</td><td class="td-mono">${c.fechaArchivo||'—'}</td><td><button class="btn btn-ghost" style="padding:5px 9px;font-size:11px" onclick="reactivarConsumible(${c.id})">Reactivar</button> <button class="action-btn" onclick="delConsumible(${c.id})">✕</button></td></tr>`).join('')||'<tr><td colspan="5"><div class="empty"><p>No hay consumibles archivados.</p></div></td></tr>';
 }
+function consumibleCosteUnidad(c){return parseFloat(c.costeUnidad)||((parseFloat(c.precio)||0)/(parseFloat(c.uds)||1));}
 function addConsumible(){
   openModal(`<div style="font-family:var(--display);font-size:17px;font-weight:800;margin-bottom:18px">Nuevo consumible</div>
     <div class="form-row cols2"><div><label>Nombre</label><input type="text" id="mc-nombre" placeholder="Iman 10mm"></div><div><label>Descripción</label><input type="text" id="mc-desc" placeholder="Iman neodimio..."></div></div>
@@ -1492,7 +1509,11 @@ function addConsumible(){
     <div style="display:flex;gap:8px;margin-top:10px"><button class="btn btn-primary" style="flex:1" onclick="saveConsumible()">Guardar</button><button class="btn btn-ghost" onclick="closeModal()">Cancelar</button></div>`);
 }
 function saveConsumible(id){
-  const c={id:id||D.nextId.con++,nombre:document.getElementById('mc-nombre').value.trim(),desc:document.getElementById('mc-desc').value.trim(),uds:parseFloat(document.getElementById('mc-uds').value)||1,precio:parseFloat(document.getElementById('mc-precio').value)||0,stock:parseFloat(document.getElementById('mc-stock').value)||0,proveedor:document.getElementById('mc-prov').value.trim(),link:document.getElementById('mc-link').value.trim()};
+  const old=id?D.consumibles.find(x=>x.id===id):null;
+  const uds=parseFloat(document.getElementById('mc-uds')?.value)||(old?.uds)||1;
+  const precio=parseFloat(document.getElementById('mc-precio')?.value)||(old?.precio)||0;
+  const costeUnidad=parseFloat(document.getElementById('mc-coste')?.value)||(precio/uds);
+  const c={...(old||{}),id:id||D.nextId.con++,nombre:document.getElementById('mc-nombre').value.trim(),desc:document.getElementById('mc-desc').value.trim(),uds,precio,costeUnidad,stock:parseFloat(document.getElementById('mc-stock').value)||0,proveedor:document.getElementById('mc-prov').value.trim(),link:document.getElementById('mc-link').value.trim(),archivado:old?.archivado||false};
   if(!c.nombre){notify('El nombre es obligatorio','error');return;}
   if(id){
     const i=D.consumibles.findIndex(x=>x.id===id);
@@ -1512,11 +1533,34 @@ function editConsumible(id){
   const c=D.consumibles.find(x=>x.id===id);
   openModal(`<div style="font-family:var(--display);font-size:17px;font-weight:800;margin-bottom:18px">Editar consumible</div>
     <div class="form-row cols2"><div><label>Nombre</label><input type="text" id="mc-nombre" value="${c.nombre}"></div><div><label>Descripción</label><input type="text" id="mc-desc" value="${c.desc||''}"></div></div>
-    <div class="form-row cols3"><div><label>Uds pack</label><input type="number" id="mc-uds" value="${c.uds}"></div><div><label>Precio (€)</label><input type="number" id="mc-precio" value="${c.precio}" step="0.01"></div><div><label>Stock (uds)</label><input type="number" id="mc-stock" value="${c.stock||0}"></div></div>
+    <div class="form-row cols2"><div><label>Coste medio por unidad (€)</label><input type="number" id="mc-coste" value="${consumibleCosteUnidad(c)}" step="0.001"></div><div><label>Stock (uds)</label><input type="number" id="mc-stock" value="${c.stock||0}"></div></div>
     <div class="form-row cols2"><div><label>Proveedor</label><input type="text" id="mc-prov" value="${c.proveedor||''}"></div><div><label>Link</label><input type="text" id="mc-link" value="${c.link||''}"></div></div>
     <div style="display:flex;gap:8px;margin-top:10px"><button class="btn btn-primary" style="flex:1" onclick="saveConsumible(${id})">Guardar</button><button class="btn btn-ghost" onclick="closeModal()">Cancelar</button></div>`);
 }
-function delConsumible(id){if(!confirm('¿Borrar? También se quitará del Balance el gasto vinculado a este consumible.'))return;const c=D.consumibles.find(x=>x.id===id);if(c&&c._sbid)deleteFromSupabase('consumibles',c._sbid);const n=borrarGastosVinculados('consumible',c);limpiarActividad('consumible',id,c?.nombre);D.consumibles=D.consumibles.filter(c=>c.id!==id);save();renderConsumibles();if(document.getElementById('page-balance')?.classList.contains('active'))renderBalance();notify('Consumible eliminado'+(n?' y gasto quitado del balance':''));}
+function reponerConsumible(id){
+  const activos=D.consumibles.filter(c=>!c.archivado);if(!activos.length){notify('No hay consumibles activos','error');return;}
+  const selected=D.consumibles.find(c=>c.id===id)||activos[0];
+  openModal(`<div style="font-family:var(--display);font-size:17px;font-weight:800;margin-bottom:18px">Reponer consumible</div>
+    <div class="form-row"><div><label>Consumible</label><select id="rc-id">${activos.map(c=>`<option value="${c.id}"${c.id===selected.id?' selected':''}>${c.nombre} · quedan ${c.stock||0}</option>`).join('')}</select></div></div>
+    <div class="form-row cols2"><div><label>Unidades compradas</label><input type="number" id="rc-uds" min="1" value="10"></div><div><label>Precio total (€)</label><input type="number" id="rc-precio" min="0" step="0.01" value="0"></div></div>
+    <div class="form-row cols2"><div><label>Sitio de compra</label><input type="text" id="rc-prov" value="${selected.proveedor||''}"></div><div><label>Fecha</label><input type="date" id="rc-fecha" value="${displayDateToInput(today())}"></div></div>
+    <div style="display:flex;gap:8px"><button class="btn btn-primary" style="flex:1" onclick="saveReposicionConsumible()">Sumar unidades y registrar gasto</button><button class="btn btn-ghost" onclick="closeModal()">Cancelar</button></div>`);
+}
+function saveReposicionConsumible(){
+  const c=D.consumibles.find(x=>String(x.id)===document.getElementById('rc-id').value);if(!c)return;
+  const unidades=parseFloat(document.getElementById('rc-uds').value)||0;const importe=parseFloat(document.getElementById('rc-precio').value)||0;
+  if(unidades<=0){notify('Indica cuántas unidades has comprado','error');return;}
+  const stockAnterior=parseFloat(c.stock)||0;const stockNuevo=stockAnterior+unidades;
+  c.costeUnidad=stockNuevo>0?((stockAnterior*consumibleCosteUnidad(c))+importe)/stockNuevo:consumibleCosteUnidad(c);c.stock=stockNuevo;
+  const prov=document.getElementById('rc-prov').value.trim();if(prov)c.proveedor=prov;
+  const g={id:D.nextId.gasto++,fecha:dateInputValue('rc-fecha')||today(),cat:'Accesorio',desc:`Reposición: ${c.nombre} (${unidades} uds)`,prov,importe,origen:'Consumibles',itemId:c.id};
+  D.gastos.push(g);saveToSupabase('gastos',g);if(c._sbid)saveToSupabase('consumibles',c,c._sbid);
+  addActividad(`Consumible repuesto: ${c.nombre} (+${unidades})`,{tipo:'gasto',refType:'consumible',refId:c.id});
+  save();queueConfigSave('actividad');closeModal();renderConsumibles();renderDashboard();notify('Reposición guardada y gasto registrado');
+}
+function archivarConsumible(id){const c=D.consumibles.find(x=>x.id===id);if(!c)return;if(!confirm(`¿Archivar ${c.nombre}? Dejará de aparecer en la Calculadora.`))return;c.archivado=true;c.fechaArchivo=today();if(c._sbid)saveToSupabase('consumibles',c,c._sbid);save();renderConsumibles();notify('Consumible archivado');}
+function reactivarConsumible(id){const c=D.consumibles.find(x=>x.id===id);if(!c)return;c.archivado=false;c.fechaArchivo='';if(c._sbid)saveToSupabase('consumibles',c,c._sbid);save();renderConsumibles();notify('Consumible reactivado');}
+function delConsumible(id){if(!confirm('¿Eliminar definitivamente este consumible y todos sus gastos vinculados?'))return;const c=D.consumibles.find(x=>x.id===id);if(c&&c._sbid)deleteFromSupabase('consumibles',c._sbid);const n=borrarGastosVinculados('consumible',c);limpiarActividad('consumible',id,c?.nombre);D.consumibles=D.consumibles.filter(c=>c.id!==id);save();renderConsumibles();if(document.getElementById('page-balance')?.classList.contains('active'))renderBalance();notify('Consumible eliminado'+(n?' y gastos quitados del balance':''));}
 
 // ══════════════════════════════════════════════════════
 // MATERIALES EXTRA
@@ -1524,8 +1568,9 @@ function delConsumible(id){if(!confirm('¿Borrar? También se quitará del Balan
 function renderMaterialesExtra(){
   const tbody=document.getElementById('mat-table');
   const search=(document.getElementById('mat-search')?.value||'').toLowerCase().trim();
-  const items=D.materiales.filter(m=>!search||`${m.nombre||''} ${m.tipo||''} ${m.marca||''} ${m.proveedor||''}`.toLowerCase().includes(search));
-  if(!items.length){tbody.innerHTML='<tr><td colspan="9"><div class="empty"><p>No hay herramientas ni materiales extra.</p></div></td></tr>';return;}
+  const matches=m=>!search||`${m.nombre||''} ${m.tipo||''} ${m.marca||''} ${m.proveedor||''}`.toLowerCase().includes(search);
+  const items=D.materiales.filter(m=>!m.archivado&&matches(m));
+  const historicos=D.materiales.filter(m=>m.archivado&&matches(m));
   tbody.innerHTML=items.slice().reverse().map(m=>`
     <tr>
       <td class="td-main">${m.nombre}</td>
@@ -1534,17 +1579,19 @@ function renderMaterialesExtra(){
       <td style="color:var(--text3)">${m.proveedor||'—'}</td>
       <td class="td-mono">${m.cantidad||1}</td>
       <td class="td-mono" style="color:var(--red)">${fmt(m.precio)}</td>
-      <td class="td-mono" style="color:var(--accent2)">${fmt((parseFloat(m.precio)||0)/(parseFloat(m.cantidad)||1))}/ud</td>
       <td>${m.link?`<a href="${m.link}" target="_blank" style="color:var(--accent2)">Abrir</a>`:'—'}</td>
-      <td style="white-space:nowrap"><button class="action-btn" onclick="editMaterialExtra(${m.id})">✎</button><button class="action-btn" onclick="delMaterialExtra(${m.id})">✕</button></td>
-    </tr>`).join('');
+      <td style="white-space:nowrap"><button class="action-btn" onclick="editMaterialExtra(${m.id})">✎</button><button class="btn btn-ghost" style="padding:5px 9px;font-size:11px" onclick="archivarMaterialExtra(${m.id})">Retirar</button></td>
+    </tr>`).join('')||'<tr><td colspan="8"><div class="empty"><p>No hay equipamiento en uso.</p></div></td></tr>';
+  const history=document.getElementById('mat-history-table');
+  history.innerHTML=historicos.slice().reverse().map(m=>`<tr><td class="td-main">${m.nombre}</td><td>${equipamientoTipo(m)}</td><td>${m.marca||'—'}</td><td class="td-mono">${m.fecha||'—'}</td><td class="td-mono">${m.fechaArchivo||'—'}</td><td><button class="btn btn-ghost" style="padding:5px 9px;font-size:11px" onclick="reactivarMaterialExtra(${m.id})">Reactivar</button> <button class="action-btn" onclick="delMaterialExtra(${m.id})">✕</button></td></tr>`).join('')||'<tr><td colspan="6"><div class="empty"><p>No hay equipamiento retirado.</p></div></td></tr>';
 }
+function equipamientoTipo(m){return m.tipo==='Herramienta'?'Herramienta':'Accesorio';}
 function materialExtraForm(m={}){
   const id=m.id||'';
-  return `<div style="font-family:var(--display);font-size:17px;font-weight:800;margin-bottom:18px">${id?'Editar':'Nuevo'} material</div>
+  return `<div style="font-family:var(--display);font-size:17px;font-weight:800;margin-bottom:18px">${id?'Editar':'Nuevo'} equipamiento</div>
     <div class="form-row cols2">
-      <div><label>Nombre</label><input type="text" id="mx-nombre" value="${m.nombre||''}" placeholder="Espátula, boquillas, cinta..."></div>
-      <div><label>Tipo</label><select id="mx-tipo">${['Herramienta','Accesorio','Impresora','Envio','Otro'].map(t=>`<option${t===(m.tipo||'Herramienta')?' selected':''}>${t}</option>`).join('')}</select></div>
+      <div><label>Nombre</label><input type="text" id="mx-nombre" value="${m.nombre||''}" placeholder="Secador, tapete de corte, pegamento..."></div>
+      <div><label>Tipo</label><select id="mx-tipo">${['Accesorio','Herramienta'].map(t=>`<option${t===equipamientoTipo(m)?' selected':''}>${t}</option>`).join('')}</select></div>
     </div>
     <div class="form-row cols2">
       <div><label>Marca</label><input type="text" id="mx-marca" value="${m.marca||''}" placeholder="Bambu Lab, ELEGOO..."></div>
@@ -1567,7 +1614,8 @@ function gastoFromMaterial(m,gastoId){
   return {id:gastoId||D.nextId.gasto++,fecha:m.fecha||today(),cat:m.tipo||'Herramienta',desc:m.nombre+(m.notas?' — '+m.notas:''),prov:m.proveedor||m.marca||'',importe:parseFloat(m.precio)||0,origen:'Materiales',itemId:m.id};
 }
 function saveMaterialExtra(id){
-  const m={id:id||D.nextId.mat++,nombre:document.getElementById('mx-nombre').value.trim(),tipo:document.getElementById('mx-tipo').value,marca:document.getElementById('mx-marca').value.trim(),proveedor:document.getElementById('mx-prov').value.trim(),cantidad:parseFloat(document.getElementById('mx-cantidad').value)||1,precio:parseFloat(document.getElementById('mx-precio').value)||0,fecha:dateInputValue('mx-fecha')||today(),link:document.getElementById('mx-link').value.trim(),notas:document.getElementById('mx-notas').value.trim()};
+  const old=id?D.materiales.find(x=>x.id===id):null;
+  const m={...(old||{}),id:id||D.nextId.mat++,nombre:document.getElementById('mx-nombre').value.trim(),tipo:document.getElementById('mx-tipo').value,marca:document.getElementById('mx-marca').value.trim(),proveedor:document.getElementById('mx-prov').value.trim(),cantidad:parseFloat(document.getElementById('mx-cantidad').value)||1,precio:parseFloat(document.getElementById('mx-precio').value)||0,fecha:dateInputValue('mx-fecha')||today(),link:document.getElementById('mx-link').value.trim(),notas:document.getElementById('mx-notas').value.trim(),archivado:old?.archivado||false};
   if(!m.nombre){notify('El nombre es obligatorio','error');return;}
   if(id){
     const i=D.materiales.findIndex(x=>x.id===id);
@@ -1583,19 +1631,21 @@ function saveMaterialExtra(id){
     const g=gastoFromMaterial(m);
     D.gastos.push(g);
     saveToSupabase('gastos',g);
-    addActividad('Material añadido: '+m.nombre,{tipo:'gasto',refType:'material',refId:m.id});
+    addActividad('Equipamiento añadido: '+m.nombre,{tipo:'gasto',refType:'material',refId:m.id});
   }
-  save();queueConfigSave('materiales','actividad');closeModal();renderMaterialesExtra();notify(id?'Material actualizado':'Material añadido y gasto registrado');
+  save();queueConfigSave('materiales','actividad');closeModal();renderMaterialesExtra();notify(id?'Equipamiento actualizado':'Equipamiento añadido y gasto registrado');
 }
+function archivarMaterialExtra(id){const m=D.materiales.find(x=>x.id===id);if(!m)return;if(!confirm(`¿Retirar ${m.nombre}? El gasto se conservará en el Balance.`))return;m.archivado=true;m.fechaArchivo=today();save();queueConfigSave('materiales');renderMaterialesExtra();notify('Equipamiento retirado');}
+function reactivarMaterialExtra(id){const m=D.materiales.find(x=>x.id===id);if(!m)return;m.archivado=false;m.fechaArchivo='';save();queueConfigSave('materiales');renderMaterialesExtra();notify('Equipamiento reactivado');}
 function delMaterialExtra(id){
-  if(!confirm('¿Borrar? También se quitará del Balance el gasto vinculado.'))return;
+  if(!confirm('¿Eliminar definitivamente este equipamiento y su gasto vinculado?'))return;
   const m=D.materiales.find(x=>x.id===id);
   const borrar=D.gastos.filter(g=>g.origen==='Materiales'&&String(g.itemId)===String(id));
   borrar.forEach(g=>{if(g._sbid)deleteFromSupabase('gastos',g._sbid);limpiarActividad('gasto',g.id,g.desc);});
   D.gastos=D.gastos.filter(g=>!borrar.includes(g));
   limpiarActividad('material',id,m?.nombre);
   D.materiales=D.materiales.filter(x=>x.id!==id);
-  save();queueConfigSave('materiales','actividad');renderMaterialesExtra();if(document.getElementById('page-balance')?.classList.contains('active'))renderBalance();notify('Material eliminado'+(borrar.length?' y gasto quitado del balance':''));
+  save();queueConfigSave('materiales','actividad');renderMaterialesExtra();if(document.getElementById('page-balance')?.classList.contains('active'))renderBalance();notify('Equipamiento eliminado'+(borrar.length?' y gasto quitado del balance':''));
 }
 
 // ══════════════════════════════════════════════════════
@@ -1636,7 +1686,7 @@ function renderCatalogo(){
     <td style="white-space:nowrap">
       <button class="btn btn-pdf" onclick="openDocModal(${c.id})">DOC</button>
       <button class="btn btn-ghost" style="padding:5px 9px;font-size:11px;margin-left:4px" onclick="editCatalogoItem(${c.id})">Editar</button>
-      ${c.stockDescontado?`<button class="btn btn-ghost" style="padding:5px 9px;font-size:11px;margin-left:4px" onclick="revertirStockPedido(${c.id})">Stock</button>`:''}
+      ${c.stockDescontado?`<button class="btn btn-ghost" style="padding:5px 9px;font-size:11px;margin-left:4px" onclick="revertirStockPedido(${c.id})">Consumibles</button>`:''}
       <button class="btn btn-ghost" style="padding:5px 9px;font-size:11px;margin-left:4px" onclick="duplicarPedido(${c.id})">Duplicar</button>
       <button class="action-btn" onclick="delCatalogo(${c.id})" style="margin-left:4px">✕</button>
     </td>
@@ -1650,16 +1700,11 @@ function parseTiempoPedido(item){
 function editCatalogoItem(id){
   const item=D.catalogo.find(c=>c.id===id);if(!item)return;
   const t=parseTiempoPedido(item);
-  const filOpts=D.filamentos.map(f=>`<option value="${f.id}">${f.nombre} (${fmt4(f.precio/f.peso)}/g)</option>`).join('');
-  const conOpts=D.consumibles.map(c=>`<option value="${c.id}">${c.nombre} (${fmt(c.precio/c.uds)}/ud)</option>`).join('');
-  const filRows=[0,1,2,3].map(i=>{
-    const u=(item.usosFilamentos||[])[i]||{};
-    return `<div class="form-row cols3" style="margin-bottom:8px">
-      <div><label>Filamento ${i+1}</label><select id="ecf-sel-${i}"><option value="">— Ninguno —</option>${filOpts}</select></div>
-      <div><label>Gramos</label><input type="number" id="ecf-g-${i}" value="${u.cantidad||0}" min="0" step="0.1"></div>
-      <div><label>Actual</label><input type="text" value="${u.nombre||'—'}" readonly style="color:var(--text3)"></div>
-    </div>`;
-  }).join('');
+  const filUsados=item.usosFilamentos||[];const conUsados=item.usosConsumibles||[];
+  const filOpts=D.filamentos.filter(f=>!f.archivado||filUsados.some(u=>String(u.id)===String(f.id)||u.nombre===f.nombre)).map(f=>`<option value="${f.id}">${f.nombre} (${fmt4(f.precio/f.peso)}/g)</option>`).join('');
+  const conOpts=D.consumibles.filter(c=>!c.archivado||conUsados.some(u=>String(u.id)===String(c.id)||u.nombre===c.nombre)).map(c=>`<option value="${c.id}">${c.nombre} (${fmt(consumibleCosteUnidad(c))}/ud)</option>`).join('');
+  const filUsos=(item.usosFilamentos||[]).length?item.usosFilamentos:[{}];
+  const filRows=filUsos.map((u,i)=>editFilamentRowHtml(i,u,filOpts)).join('');
   const conRows=[0,1,2].map(i=>{
     const u=(item.usosConsumibles||[])[i]||{};
     return `<div class="form-row cols3" style="margin-bottom:8px">
@@ -1686,22 +1731,30 @@ function editCatalogoItem(id){
       <div><label>Consumo (W)</label><input type="number" id="ec-watts" value="${item.watts||D.settings.watts||65}"></div>
       <div><label>Precio kWh (€)</label><input type="number" id="ec-kwh" value="${item.kwh||D.settings.kwh||0.18}" step="0.001"></div>
     </div>
-    <div class="card" style="padding:14px;margin-bottom:12px"><div class="card-title">Filamentos</div>${filRows}</div>
+    <div class="card" style="padding:14px;margin-bottom:12px"><div class="card-title">Filamentos</div><div id="ec-fil-rows">${filRows}</div><button type="button" class="btn btn-ghost" onclick="addEditFilamentRow()">+ Añadir filamento</button></div>
     <div class="card" style="padding:14px;margin-bottom:12px"><div class="card-title">Consumibles</div>${conRows}</div>
-    <div class="form-row cols2">
-      <div><label>Notas para documento</label><input type="text" id="ec-notas-doc" value="${item.notasDoc||''}"></div>
-      <div><label>Notas internas</label><input type="text" id="ec-notas-int" value="${item.notasInternas||item.notas||''}"></div>
-    </div>
+    <div class="form-row"><div><label>Notas internas</label><input type="text" id="ec-notas-int" value="${item.notasInternas||item.notas||''}"></div></div>
     <div style="display:flex;gap:8px;margin-top:10px"><button class="btn btn-primary" style="flex:1" onclick="saveCatalogoEdit(${id})">Guardar cambios</button><button class="btn btn-ghost" onclick="closeModal()">Cancelar</button></div>`);
-  (item.usosFilamentos||[]).forEach((u,i)=>{const sel=document.getElementById(`ecf-sel-${i}`);const f=D.filamentos.find(x=>x.id===u.id)||D.filamentos.find(x=>x.nombre===u.nombre);if(sel&&f)sel.value=f.id;});
+  document.querySelectorAll('#ec-fil-rows .edit-fil-row').forEach((row,i)=>{const u=(item.usosFilamentos||[])[i]||{};const f=D.filamentos.find(x=>x.id===u.id)||D.filamentos.find(x=>x.nombre===u.nombre);if(f)row.querySelector('.ecf-sel').value=f.id;});
   (item.usosConsumibles||[]).forEach((u,i)=>{const sel=document.getElementById(`ecc-sel-${i}`);const c=D.consumibles.find(x=>x.id===u.id)||D.consumibles.find(x=>x.nombre===u.nombre);if(sel&&c)sel.value=c.id;});
+  syncEditFilamentRows();
 }
+function editFilamentRowHtml(i,u={},opts=''){
+  return `<div class="filament-entry edit-fil-row">
+    <div><label class="filament-label">Filamento ${i+1}</label><select class="ecf-sel"><option value="">— Ninguno —</option>${opts}</select></div>
+    <div><label>Gramos</label><input class="ecf-g" type="number" value="${u.cantidad||0}" min="0" step="0.1"></div>
+    <div><label>Actual</label><input type="text" value="${u.nombre||'—'}" readonly style="color:var(--text3)"></div>
+    <div></div><button type="button" class="btn btn-ghost filament-remove" title="Quitar filamento" onclick="removeEditFilamentRow(this)">×</button>
+  </div>`;
+}
+function addEditFilamentRow(){
+  const el=document.getElementById('ec-fil-rows');if(!el)return;
+  const opts=D.filamentos.filter(f=>!f.archivado).map(f=>`<option value="${f.id}">${f.nombre} (${fmt4(f.precio/f.peso)}/g)</option>`).join('');
+  el.insertAdjacentHTML('beforeend',editFilamentRowHtml(el.querySelectorAll('.edit-fil-row').length,{},opts));syncEditFilamentRows();
+}
+function removeEditFilamentRow(button){const rows=document.querySelectorAll('#ec-fil-rows .edit-fil-row');if(rows.length<=1)return;button.closest('.edit-fil-row')?.remove();syncEditFilamentRows();}
+function syncEditFilamentRows(){const rows=[...document.querySelectorAll('#ec-fil-rows .edit-fil-row')];rows.forEach((row,i)=>{row.querySelector('.filament-label').textContent=`Filamento ${i+1}`;row.querySelector('.filament-remove').hidden=rows.length===1;});}
 function devolverStockPedidoSilencioso(item){
-  (item.usosFilamentos||[]).forEach(u=>{
-    const fil=D.filamentos.find(f=>f.id===u.id)||D.filamentos.find(f=>f.nombre===u.nombre);if(!fil)return;
-    fil.stock=(parseFloat(fil.stock)||0)+(parseFloat(u.cantidad)||0);
-    if(fil._sbid)saveToSupabase('filamentos',fil,fil._sbid);
-  });
   (item.usosConsumibles||[]).forEach(u=>{
     const con=D.consumibles.find(c=>c.id===u.id)||D.consumibles.find(c=>c.nombre===u.nombre);if(!con)return;
     con.stock=(parseFloat(con.stock)||0)+(parseFloat(u.cantidad)||0);
@@ -1714,17 +1767,17 @@ function saveCatalogoEdit(id){
   const wasDiscounted=!!item.stockDescontado;
   if(wasDiscounted)devolverStockPedidoSilencioso(item);
   const usosFilamentos=[],usosConsumibles=[],mats=[];let gramos=0,tFil=0,tCon=0;
-  for(let i=0;i<4;i++){
-    const fid=parseInt(document.getElementById(`ecf-sel-${i}`)?.value||0);
-    const g=parseFloat(document.getElementById(`ecf-g-${i}`)?.value||0);
+  document.querySelectorAll('#ec-fil-rows .edit-fil-row').forEach(row=>{
+    const fid=parseInt(row.querySelector('.ecf-sel')?.value||0);
+    const g=parseFloat(row.querySelector('.ecf-g')?.value||0);
     const fil=D.filamentos.find(f=>f.id===fid);
     if(fil&&g>0){usosFilamentos.push({id:fil.id,nombre:fil.nombre,cantidad:g});mats.push(fil.nombre);gramos+=g;tFil+=g*(fil.precio/fil.peso);}
-  }
+  });
   for(let i=0;i<3;i++){
     const cid=parseInt(document.getElementById(`ecc-sel-${i}`)?.value||0);
     const q=parseFloat(document.getElementById(`ecc-q-${i}`)?.value||0);
     const con=D.consumibles.find(c=>c.id===cid);
-    if(con&&q>0){usosConsumibles.push({id:con.id,nombre:con.nombre,cantidad:q});tCon+=q*(con.precio/con.uds);}
+    if(con&&q>0){usosConsumibles.push({id:con.id,nombre:con.nombre,cantidad:q});tCon+=q*consumibleCosteUnidad(con);}
   }
   const h=parseFloat(document.getElementById('ec-horas').value||0);
   const min=parseFloat(document.getElementById('ec-minutos').value||0);
@@ -1738,7 +1791,6 @@ function saveCatalogoEdit(id){
     entrega:dateInputValue('ec-entrega').trim(),
     precioAcordado:parseFloat(document.getElementById('ec-precio').value)||'',
     horas:h,minutos:min,watts:w,kwh:k,
-    notasDoc:document.getElementById('ec-notas-doc').value.trim(),
     notasInternas:document.getElementById('ec-notas-int').value.trim(),
     materiales:mats.join(' + '),gramos:gramos.toFixed(1),tiempo:Math.floor(h)+'h '+Math.floor(min)+'min',
     coste,precioCalc:coste*((D.multiplicadores[0]?.mult)||3),usosFilamentos,usosConsumibles
@@ -1789,7 +1841,7 @@ function setEstado(id,estado){
   if(estado==='Aceptado'&&!item.stockDescontado){
     const ok=descontarStockPedido(item);
     if(!ok){refreshCatalogoViews();return;}
-    notify(item.usosFilamentos?.length||item.usosConsumibles?.length?'Pedido aceptado: stock descontado':'Pedido aceptado sin descontar stock');
+    notify(item.usosConsumibles?.length?'Pedido aceptado: consumibles descontados':'Pedido aceptado');
   }
   if(estado==='Cobrado'){
     const pa=parseFloat(item.precioAcordado)||0;
@@ -2076,7 +2128,7 @@ function renderPedidos(){
       <td style="white-space:nowrap">
         <button class="btn btn-pdf" onclick="openDocModal(${c.id})">DOC</button>
         <button class="btn btn-ghost" style="padding:5px 9px;font-size:11px;margin-left:4px" onclick="editCatalogoItem(${c.id})">Editar</button>
-        ${c.stockDescontado?`<button class="btn btn-ghost" style="padding:5px 9px;font-size:11px;margin-left:4px" onclick="revertirStockPedido(${c.id})">Stock</button>`:''}
+        ${c.stockDescontado?`<button class="btn btn-ghost" style="padding:5px 9px;font-size:11px;margin-left:4px" onclick="revertirStockPedido(${c.id})">Consumibles</button>`:''}
         <button class="btn btn-ghost" style="padding:5px 9px;font-size:11px;margin-left:4px" onclick="duplicarPedido(${c.id})">Duplicar</button>
         <button class="action-btn" onclick="delCatalogo(${c.id})" style="margin-left:4px">✕</button>
       </td>
@@ -2120,7 +2172,7 @@ function renderGastos(){
     <td class="td-main">${g.desc}</td>
     <td style="color:var(--text3)">${g.prov||'—'}</td>
     <td class="td-mono" style="color:var(--red)">${fmt(g.importe)}</td>
-    <td><span class="badge badge-gray" style="font-size:10px">${g.origen||'Manual'}</span></td>
+    <td><span class="badge badge-gray" style="font-size:10px">${g.origen==='Materiales'?'Equipamiento':(g.origen||'Manual')}</span></td>
     <td><button class="action-btn" onclick="delGasto(${g.id})">✕</button></td>
   </tr>`).join('');
 }
@@ -2223,7 +2275,6 @@ function loadSettings(){
   const ss=document.getElementById('s-sub');if(ss)ss.value=s.sub||'';
   const sw=document.getElementById('s-watts');if(sw)sw.value=s.watts||65;
   const sk=document.getElementById('s-kwh');if(sk)sk.value=s.kwh||0.18;
-  const sa=document.getElementById('s-stock-alert');if(sa)sa.value=s.stockAlert||150;
   const logoSrc = s.logo || KURIN_LOGO;
   if(logoSrc){
     const pb=document.getElementById('logo-preview-box');
@@ -2248,7 +2299,6 @@ function saveSettings(){
   D.settings.sub=document.getElementById('s-sub').value.trim();
   D.settings.watts=parseFloat(document.getElementById('s-watts').value)||65;
   D.settings.kwh=parseFloat(document.getElementById('s-kwh').value)||0.18;
-  D.settings.stockAlert=parseFloat(document.getElementById('s-stock-alert').value)||150;
   // Actualizar sidebar
   document.getElementById('app-title').innerHTML=D.settings.nombre.replace('3D','<span>3D</span>');
   if(D.settings.sub)document.getElementById('app-sub').textContent=D.settings.sub;
