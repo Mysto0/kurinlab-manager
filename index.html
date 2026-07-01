@@ -418,7 +418,7 @@ tr:hover td{background:var(--bg3);}
   </div>
   <div class="card">
     <div class="card-title">Histórico de bobinas</div>
-    <div class="table-wrap"><table><thead><tr><th>Nombre</th><th>Material</th><th>Marca</th><th>Terminado</th><th>Usado en pedidos</th><th></th></tr></thead><tbody id="fil-history-table"></tbody></table></div>
+    <div class="table-wrap"><table><thead><tr><th>Nombre</th><th>Material</th><th>Marca</th><th>Proveedor</th><th>Precio</th><th>Compra</th><th>Terminado</th><th>Usado en pedidos</th><th></th></tr></thead><tbody id="fil-history-table"></tbody></table></div>
   </div>
 </div>
 
@@ -439,7 +439,7 @@ tr:hover td{background:var(--bg3);}
   </div>
   <div class="card">
     <div class="card-title">Consumibles archivados</div>
-    <div class="table-wrap"><table><thead><tr><th>Nombre</th><th>Descripción</th><th>Stock final</th><th>Archivado</th><th></th></tr></thead><tbody id="con-history-table"></tbody></table></div>
+    <div class="table-wrap"><table><thead><tr><th>Nombre</th><th>Descripción</th><th>Proveedor</th><th>Coste medio</th><th>Compra</th><th>Stock final</th><th>Archivado</th><th></th></tr></thead><tbody id="con-history-table"></tbody></table></div>
   </div>
 </div>
 
@@ -461,7 +461,7 @@ tr:hover td{background:var(--bg3);}
   </div>
   <div class="card">
     <div class="card-title">Equipamiento retirado</div>
-    <div class="table-wrap"><table><thead><tr><th>Nombre</th><th>Tipo</th><th>Marca</th><th>Fecha de compra</th><th>Retirado</th><th></th></tr></thead><tbody id="mat-history-table"></tbody></table></div>
+    <div class="table-wrap"><table><thead><tr><th>Nombre</th><th>Tipo</th><th>Marca</th><th>Proveedor</th><th>Precio</th><th>Compra</th><th>Fecha de compra</th><th>Retirado</th><th></th></tr></thead><tbody id="mat-history-table"></tbody></table></div>
   </div>
 </div>
 
@@ -1470,11 +1470,11 @@ function renderFilamentos(){
     </tr>`).join('')||'<tr><td colspan="11"><div class="empty"><p>No hay bobinas en uso.</p></div></td></tr>';
   const history=document.getElementById('fil-history-table');
   history.innerHTML=historicos.slice().reverse().map(f=>`<tr>
-    <td class="td-main">${f.nombre}</td><td>${f.material||'—'}</td><td>${f.marca||'—'}</td>
+    <td class="td-main">${f.nombre}</td><td>${f.material||'—'}</td><td>${f.marca||'—'}</td><td>${f.proveedor||'—'}</td><td class="td-mono">${fmt(f.precio)}</td><td>${f.link?`<a href="${f.link}" target="_blank" style="color:var(--blue)">Abrir</a>`:'—'}</td>
     <td class="td-mono">${f.fechaRetirada||'—'}</td>
     <td class="td-mono">${filamentoGramosPedidos(f).toFixed(1)}g</td>
-    <td><button class="btn btn-ghost" style="padding:5px 9px;font-size:11px" onclick="reactivarFilamento(${f.id})">Reactivar</button> <button class="action-btn" onclick="delFilamento(${f.id})">✕</button></td>
-  </tr>`).join('')||'<tr><td colspan="6"><div class="empty"><p>Todavía no hay bobinas terminadas.</p></div></td></tr>';
+    <td style="white-space:nowrap"><button class="action-btn edit" onclick="editFilamento(${f.id})">✏</button> <button class="btn btn-ghost" style="padding:5px 9px;font-size:11px" onclick="reactivarFilamento(${f.id})">Reactivar</button> <button class="action-btn" onclick="delFilamento(${f.id})">✕</button></td>
+  </tr>`).join('')||'<tr><td colspan="9"><div class="empty"><p>Todavía no hay bobinas terminadas.</p></div></td></tr>';
 }
 function updateStock(type,id,val){
   const c=D.consumibles.find(x=>x.id===id);if(c){c.stock=parseFloat(val)||0;if(c._sbid)saveToSupabase('consumibles',c,c._sbid);save();renderConsumibles();notifyLowConsumibles([c]);}
@@ -1589,7 +1589,7 @@ function renderConsumibles(){
       </td>
     </tr>`;}).join('')||'<tr><td colspan="7"><div class="empty"><p>No hay consumibles activos.</p></div></td></tr>';
   const history=document.getElementById('con-history-table');
-  history.innerHTML=historicos.slice().reverse().map(c=>`<tr><td class="td-main">${c.nombre}</td><td>${c.desc||'—'}</td><td class="td-mono">${c.stock||0} uds</td><td class="td-mono">${c.fechaArchivo||'—'}</td><td><button class="btn btn-ghost" style="padding:5px 9px;font-size:11px" onclick="reactivarConsumible(${c.id})">Reactivar</button> <button class="action-btn" onclick="delConsumible(${c.id})">✕</button></td></tr>`).join('')||'<tr><td colspan="5"><div class="empty"><p>No hay consumibles archivados.</p></div></td></tr>';
+  history.innerHTML=historicos.slice().reverse().map(c=>`<tr><td class="td-main">${c.nombre}</td><td>${c.desc||'—'}</td><td>${c.proveedor||'—'}</td><td class="td-mono">${fmt(consumibleCosteUnidad(c))}/ud</td><td>${c.link?`<a href="${c.link}" target="_blank" style="color:var(--blue)">Abrir</a>`:'—'}</td><td class="td-mono">${c.stock||0} uds</td><td class="td-mono">${c.fechaArchivo||'—'}</td><td style="white-space:nowrap"><button class="action-btn edit" onclick="editConsumible(${c.id})">✏</button> <button class="btn btn-ghost" style="padding:5px 9px;font-size:11px" onclick="reactivarConsumible(${c.id})">Reactivar</button> <button class="action-btn" onclick="delConsumible(${c.id})">✕</button></td></tr>`).join('')||'<tr><td colspan="8"><div class="empty"><p>No hay consumibles archivados.</p></div></td></tr>';
 }
 function consumibleCosteUnidad(c){return parseFloat(c.costeUnidad)||((parseFloat(c.precio)||0)/(parseFloat(c.uds)||1));}
 function addConsumible(){
@@ -1674,7 +1674,7 @@ function renderMaterialesExtra(){
       <td style="white-space:nowrap"><button class="action-btn" onclick="editMaterialExtra(${m.id})">✎</button><button class="btn btn-ghost" style="padding:5px 9px;font-size:11px" onclick="archivarMaterialExtra(${m.id})">Retirar</button></td>
     </tr>`).join('')||'<tr><td colspan="8"><div class="empty"><p>No hay equipamiento en uso.</p></div></td></tr>';
   const history=document.getElementById('mat-history-table');
-  history.innerHTML=historicos.slice().reverse().map(m=>`<tr><td class="td-main">${m.nombre}</td><td>${equipamientoTipo(m)}</td><td>${m.marca||'—'}</td><td class="td-mono">${m.fecha||'—'}</td><td class="td-mono">${m.fechaArchivo||'—'}</td><td><button class="btn btn-ghost" style="padding:5px 9px;font-size:11px" onclick="reactivarMaterialExtra(${m.id})">Reactivar</button> <button class="action-btn" onclick="delMaterialExtra(${m.id})">✕</button></td></tr>`).join('')||'<tr><td colspan="6"><div class="empty"><p>No hay equipamiento retirado.</p></div></td></tr>';
+  history.innerHTML=historicos.slice().reverse().map(m=>`<tr><td class="td-main">${m.nombre}</td><td>${equipamientoTipo(m)}</td><td>${m.marca||'—'}</td><td>${m.proveedor||'—'}</td><td class="td-mono">${fmt(m.precio)}</td><td>${m.link?`<a href="${m.link}" target="_blank" style="color:var(--accent2)">Abrir</a>`:'—'}</td><td class="td-mono">${m.fecha||'—'}</td><td class="td-mono">${m.fechaArchivo||'—'}</td><td style="white-space:nowrap"><button class="action-btn edit" onclick="editMaterialExtra(${m.id})">✏</button> <button class="btn btn-ghost" style="padding:5px 9px;font-size:11px" onclick="reactivarMaterialExtra(${m.id})">Reactivar</button> <button class="action-btn" onclick="delMaterialExtra(${m.id})">✕</button></td></tr>`).join('')||'<tr><td colspan="9"><div class="empty"><p>No hay equipamiento retirado.</p></div></td></tr>';
 }
 function equipamientoTipo(m){return m.tipo==='Herramienta'?'Herramienta':'Accesorio';}
 function materialExtraForm(m={}){
