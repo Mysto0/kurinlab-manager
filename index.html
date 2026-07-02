@@ -94,6 +94,8 @@ textarea{resize:vertical;min-height:60px;}
 .print-plate-actions{display:flex;gap:6px;align-items:center;}
 .plate-filaments{margin-top:12px;padding-top:12px;border-top:1px solid var(--border);}
 .plate-add-filament{margin-top:2px;}
+.duration-input.invalid{border-color:var(--red);color:var(--red);}
+.duration-output.invalid{color:var(--red)!important;}
 .quick-actions{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:18px;}
 .quick-actions .btn{display:inline-flex;align-items:center;gap:6px;}
 .btn{padding:9px 18px;border-radius:8px;font-size:13px;font-weight:500;cursor:pointer;transition:all 0.15s;border:none;font-family:var(--sans);}
@@ -1199,13 +1201,14 @@ function initCalc(){
 }
 function renderFilRows(){
   const el=document.getElementById('plate-rows');el.innerHTML='';
-  addPrintPlate({horas:1,minutos:30,filamentos:[{cantidad:15}]});
+  addPrintPlate({duracionMinutos:90,filamentos:[{cantidad:15}]});
 }
 function addPrintPlate(values={}){
   const el=document.getElementById('plate-rows');if(!el)return;
+  const durationMinutes=values.duracionMinutos??Math.round((parseFloat(values.horas)||0)*60+(parseFloat(values.minutos)||0));
   const plate=document.createElement('div');plate.className='print-plate';
   plate.innerHTML=`<div class="print-plate-header"><div class="print-plate-title">Placa</div><div class="print-plate-actions"><button type="button" class="action-btn plate-remove" title="Quitar placa" onclick="removePrintPlate(this)">×</button></div></div>
-    <div class="form-row cols3"><div><label>Horas</label><input class="plate-hours" type="number" value="${values.horas??0}" min="0" step="0.1" oninput="calcular()"></div><div><label>Minutos</label><input class="plate-minutes" type="number" value="${values.minutos??0}" min="0" max="59" step="1" oninput="calcular()"></div><div><label>Duración</label><input class="plate-duration" type="text" readonly style="color:var(--text3)"></div></div>
+    <div class="form-row cols2"><div><label>Duración de impresión</label><input class="plate-duration-input duration-input" type="text" value="${formatDurationMinutes(durationMinutes)}" placeholder="Ej: 9h03m, 27min o 9.1h" oninput="calcular()"></div><div><label>Interpretado como</label><input class="plate-duration duration-output" type="text" readonly style="color:var(--text3)"></div></div>
     <div class="plate-filaments"><div class="plate-filament-rows"></div><button type="button" class="btn btn-ghost plate-add-filament" onclick="addFilamentRow(this.closest('.print-plate'))">+ Añadir filamento</button></div>`;
   el.appendChild(plate);
   const filamentos=values.filamentos?.length?values.filamentos:[{}];
@@ -1278,8 +1281,7 @@ function calcFilamentUses(container=document){
 function calcPlateData(){
   return [...document.querySelectorAll('#plate-rows .print-plate')].map((plate,i)=>({
     nombre:`Placa ${i+1}`,
-    horas:parseFloat(plate.querySelector('.plate-hours')?.value||0),
-    minutos:parseFloat(plate.querySelector('.plate-minutes')?.value||0),
+    duracionMinutos:updatePlateDurationDisplay(plate),
     filamentos:calcFilamentUses(plate).map(u=>({id:u.filamento.id,nombre:u.filamento.nombre,cantidad:u.cantidad}))
   }));
 }
@@ -1288,9 +1290,30 @@ function aggregateFilamentUses(usos){
   usos.forEach(u=>{const key=String(u.id||u.nombre);const prev=grouped.get(key)||{id:u.id,nombre:u.nombre,cantidad:0};prev.cantidad+=(parseFloat(u.cantidad)||0);grouped.set(key,prev);});
   return [...grouped.values()];
 }
-function formatDuration(hours){
-  const totalMinutes=Math.max(0,Math.round((parseFloat(hours)||0)*60));
-  return `${Math.floor(totalMinutes/60)}h ${totalMinutes%60}min`;
+function parseDurationToMinutes(value){
+  const raw=String(value||'').trim().toLowerCase().replace(/,/g,'.');
+  if(!raw)return null;
+  let match=raw.match(/^(\d+)\s*h\s*(\d+)\s*(?:m|min|minuto|minutos)$/);
+  if(match){const minutes=parseInt(match[2],10);return minutes<60?parseInt(match[1],10)*60+minutes:null;}
+  match=raw.match(/^(\d+(?:\.\d+)?)\s*h$/);
+  if(match)return Math.round(parseFloat(match[1])*60);
+  match=raw.match(/^(\d+)\s*(?:m|min|minuto|minutos)$/);
+  if(match)return parseInt(match[1],10);
+  return null;
+}
+function formatDurationMinutes(totalMinutes){
+  const total=Math.max(0,Math.round(parseFloat(totalMinutes)||0));const hours=Math.floor(total/60);const minutes=total%60;
+  return hours?`${hours}h ${String(minutes).padStart(2,'0')}min`:`${minutes}min`;
+}
+function updatePlateDurationDisplay(plate){
+  const input=plate?.querySelector('.plate-duration-input');const output=plate?.querySelector('.plate-duration');if(!input)return 0;
+  const minutes=parseDurationToMinutes(input.value);const invalid=minutes===null;
+  input.classList.toggle('invalid',invalid);if(output){output.classList.toggle('invalid',invalid);output.value=invalid?'Formato no válido':formatDurationMinutes(minutes);}
+  return invalid?0:minutes;
+}
+function validatePlateDurations(containerSelector){
+  const inputs=[...document.querySelectorAll(`${containerSelector} .plate-duration-input`)];const invalid=inputs.find(input=>parseDurationToMinutes(input.value)===null);
+  if(invalid){invalid.classList.add('invalid');invalid.focus();notify('Revisa el formato de duración','error');return false;}return true;
 }
 function renderConRows(){
   const el=document.getElementById('con-rows');el.innerHTML='';
@@ -1322,9 +1345,8 @@ function renderMultRows(){
 }
 function calcular(){
   const placas=calcPlateData();
-  const th=placas.reduce((total,p)=>total+p.horas+p.minutos/60,0);
-  document.querySelectorAll('#plate-rows .print-plate').forEach((plate,i)=>{const duration=plate.querySelector('.plate-duration');if(duration)duration.value=formatDuration((placas[i]?.horas||0)+(placas[i]?.minutos||0)/60);});
-  const thEl=document.getElementById('c-total-h');if(thEl)thEl.value=formatDuration(th);
+  const totalMinutes=placas.reduce((total,p)=>total+p.duracionMinutos,0);const th=totalMinutes/60;
+  const thEl=document.getElementById('c-total-h');if(thEl)thEl.value=formatDurationMinutes(totalMinutes);
   const w=parseFloat(document.getElementById('c-watts')?.value||65);
   const k=parseFloat(document.getElementById('c-kwh')?.value||0.18);
   const elec=th*w/1000*k;
@@ -1351,7 +1373,7 @@ function calcular(){
     if(ccEl)ccEl.value=fmtCost(cost);
   }
   const total=tFil+elec+tCon;
-  const platesEl=document.getElementById('r-plates');if(platesEl)platesEl.textContent=`${placas.length} ${placas.length===1?'placa':'placas'} · ${formatDuration(th)}`;
+  const platesEl=document.getElementById('r-plates');if(platesEl)platesEl.textContent=`${placas.length} ${placas.length===1?'placa':'placas'} · ${formatDurationMinutes(totalMinutes)}`;
   document.getElementById('r-fil').textContent=fmtCost(tFil);
   document.getElementById('r-elec').textContent=fmtCost(elec);
   document.getElementById('r-con').textContent=fmtCost(tCon);
@@ -1413,6 +1435,7 @@ function guardarEnCatalogo(){
   if(!nombre){notify('Pon primero el nombre del producto','error');return;}
   const cliente=document.getElementById('c-cliente').value.trim();
   if(!cliente){notify('Pon el nombre del cliente','error');return;}
+  if(!validatePlateDurations('#plate-rows'))return;
   const contacto=document.getElementById('c-contacto').value.trim();
   const entrega=dateInputValue('c-entrega').trim();
   const anticipo=parseFloat(document.getElementById('c-anticipo').value)||0;
@@ -1429,9 +1452,7 @@ function guardarEnCatalogo(){
     const con=D.consumibles.find(c=>c.id===cid);
     if(con&&q>0)usosConsumibles.push({id:con.id,nombre:con.nombre,cantidad:q});
   }
-  const th=placas.reduce((total,p)=>total+p.horas+p.minutos/60,0);
-  const totalMinutes=Math.max(0,Math.round(th*60));
-  const h=Math.floor(totalMinutes/60);const min=totalMinutes%60;
+  const totalMinutes=placas.reduce((total,p)=>total+p.duracionMinutos,0);const th=totalMinutes/60;
   const w=parseFloat(document.getElementById('c-watts').value||65);
   const k=parseFloat(document.getElementById('c-kwh').value||0.18);
   let tFil=0,tCon=0;
@@ -1440,7 +1461,7 @@ function guardarEnCatalogo(){
   const total=tFil+th*w/1000*k+tCon;
   const mRef=D.multiplicadores[0];
   const precioCalc=total*(mRef?.mult||3);
-  const item={id:D.nextId.cat++,nombre,cliente,contacto,entrega,anticipo,notasInternas,materiales:mats.join(' + '),gramos:gramos.toFixed(1),tiempo:`${h}h ${min}min`,horas:h,minutos:min,watts:w,kwh:k,placas,coste:total,precioCalc,precioAcordado:'',estado:'Presupuesto',fecha:today(),fechaCobro:'',notas:'',usosFilamentos,usosConsumibles,stockDescontado:false};
+  const item={id:D.nextId.cat++,nombre,cliente,contacto,entrega,anticipo,notasInternas,materiales:mats.join(' + '),gramos:gramos.toFixed(1),tiempo:formatDurationMinutes(totalMinutes),tiempoMinutos:totalMinutes,watts:w,kwh:k,placas,coste:total,precioCalc,precioAcordado:'',estado:'Presupuesto',fecha:today(),fechaCobro:'',notas:'',usosFilamentos,usosConsumibles,stockDescontado:false};
   D.catalogo.push(item);
   saveToSupabase('catalogo',item);
   addActividad(`Presupuesto guardado: ${nombre}`,{tipo:'guardar',refType:'catalogo',refId:item.id});
@@ -1785,9 +1806,9 @@ function renderCatalogo(){
   </tr>`).join('');
 }
 function parseTiempoPedido(item){
-  if(item.horas!==undefined||item.minutos!==undefined)return {h:parseFloat(item.horas)||0,min:parseFloat(item.minutos)||0};
-  const m=String(item.tiempo||'').match(/(\d+(?:\.\d+)?)h\s+(\d+(?:\.\d+)?)min/);
-  return m?{h:parseFloat(m[1])||0,min:parseFloat(m[2])||0}:{h:1,min:30};
+  if(item.tiempoMinutos!==undefined)return Math.max(0,Math.round(parseFloat(item.tiempoMinutos)||0));
+  if(item.horas!==undefined||item.minutos!==undefined)return Math.max(0,Math.round((parseFloat(item.horas)||0)*60+(parseFloat(item.minutos)||0)));
+  return parseDurationToMinutes(item.tiempo)??90;
 }
 function editCatalogoItem(id){
   const item=D.catalogo.find(c=>c.id===id);if(!item)return;
@@ -1824,14 +1845,22 @@ function editCatalogoItem(id){
   syncEditPlates();updateEditPlateCosts();
 }
 function pedidoPlacas(item){
-  if(Array.isArray(item.placas)&&item.placas.length)return item.placas.map((p,i)=>({nombre:`Placa ${i+1}`,horas:parseFloat(p.horas)||0,minutos:parseFloat(p.minutos)||0,filamentos:(p.filamentos||[]).map(u=>({...u}))}));
-  const t=parseTiempoPedido(item);
-  return [{nombre:'Placa 1',horas:t.h,minutos:t.min,filamentos:(item.usosFilamentos||[]).map(u=>({...u}))}];
+  if(Array.isArray(item.placas)&&item.placas.length){
+    return item.placas.map((p,i)=>({
+      nombre:`Placa ${i+1}`,
+      duracionMinutos:p.duracionMinutos!==undefined
+        ?Math.max(0,Math.round(parseFloat(p.duracionMinutos)||0))
+        :Math.max(0,Math.round((parseFloat(p.horas)||0)*60+(parseFloat(p.minutos)||0))),
+      filamentos:(p.filamentos||[]).map(u=>({...u}))
+    }));
+  }
+  return [{nombre:'Placa 1',duracionMinutos:parseTiempoPedido(item),filamentos:(item.usosFilamentos||[]).map(u=>({...u}))}];
 }
 function editPlateHtml(i,plate={}){
   const filamentos=plate.filamentos?.length?plate.filamentos:[{}];
+  const durationMinutes=plate.duracionMinutos??Math.round((parseFloat(plate.horas)||0)*60+(parseFloat(plate.minutos)||0));
   return `<div class="print-plate edit-print-plate"><div class="print-plate-header"><div class="print-plate-title">Placa ${i+1}</div><div class="print-plate-actions"><button type="button" class="action-btn plate-remove" title="Quitar placa" onclick="removeEditPlate(this)">×</button></div></div>
-    <div class="form-row cols3"><div><label>Horas</label><input class="plate-hours" type="number" value="${plate.horas||0}" min="0" step="0.1" oninput="updateEditPlateCosts()"></div><div><label>Minutos</label><input class="plate-minutes" type="number" value="${plate.minutos||0}" min="0" max="59" step="1" oninput="updateEditPlateCosts()"></div><div><label>Duración</label><input class="plate-duration" type="text" readonly style="color:var(--text3)"></div></div>
+    <div class="form-row cols2"><div><label>Duración de impresión</label><input class="plate-duration-input duration-input" type="text" value="${formatDurationMinutes(durationMinutes)}" placeholder="Ej: 9h03m, 27min o 9.1h" oninput="updateEditPlateCosts()"></div><div><label>Interpretado como</label><input class="plate-duration duration-output" type="text" readonly style="color:var(--text3)"></div></div>
     <div class="plate-filaments"><div class="edit-plate-filament-rows">${filamentos.map((u,j)=>editFilamentRowHtml(j,u)).join('')}</div><button type="button" class="btn btn-ghost plate-add-filament" onclick="addEditFilamentRow(this.closest('.edit-print-plate'))">+ Añadir filamento</button></div></div>`;
 }
 function editFilamentRowHtml(i,u={}){
@@ -1853,9 +1882,9 @@ function addEditFilamentRow(plate){
 function removeEditFilamentRow(button){const plate=button.closest('.edit-print-plate');const rows=plate?.querySelectorAll('.edit-fil-row')||[];if(rows.length<=1)return;button.closest('.edit-fil-row')?.remove();syncEditFilamentRows(plate);updateEditPlateCosts();}
 function syncEditPlates(){const plates=[...document.querySelectorAll('#ec-plate-rows .edit-print-plate')];plates.forEach((plate,i)=>{plate.querySelector('.print-plate-title').textContent=`Placa ${i+1}`;plate.querySelector('.plate-remove').hidden=plates.length===1;syncEditFilamentRows(plate);});}
 function syncEditFilamentRows(plate){const rows=[...(plate?.querySelectorAll('.edit-fil-row')||[])];rows.forEach((row,i)=>{row.querySelector('.filament-label').textContent=`Filamento ${i+1}`;row.querySelector('.filament-remove').hidden=rows.length===1;});}
-function calcEditPlateData(){return [...document.querySelectorAll('#ec-plate-rows .edit-print-plate')].map((plate,i)=>({nombre:`Placa ${i+1}`,horas:parseFloat(plate.querySelector('.plate-hours')?.value||0),minutos:parseFloat(plate.querySelector('.plate-minutes')?.value||0),filamentos:[...plate.querySelectorAll('.edit-fil-row')].map(row=>{const id=calcFilamentId(row);const fil=D.filamentos.find(f=>f.id===id);const cantidad=parseFloat(row.querySelector('.ecf-g')?.value||0);return fil&&cantidad>0?{id:fil.id,nombre:fil.nombre,cantidad}:null;}).filter(Boolean)}));}
+function calcEditPlateData(){return [...document.querySelectorAll('#ec-plate-rows .edit-print-plate')].map((plate,i)=>({nombre:`Placa ${i+1}`,duracionMinutos:updatePlateDurationDisplay(plate),filamentos:[...plate.querySelectorAll('.edit-fil-row')].map(row=>{const id=calcFilamentId(row);const fil=D.filamentos.find(f=>f.id===id);const cantidad=parseFloat(row.querySelector('.ecf-g')?.value||0);return fil&&cantidad>0?{id:fil.id,nombre:fil.nombre,cantidad}:null;}).filter(Boolean)}));}
 function updateEditPlateCosts(){
-  document.querySelectorAll('#ec-plate-rows .edit-print-plate').forEach(plate=>{const h=parseFloat(plate.querySelector('.plate-hours')?.value||0);const m=parseFloat(plate.querySelector('.plate-minutes')?.value||0);const duration=plate.querySelector('.plate-duration');if(duration)duration.value=formatDuration(h+m/60);plate.querySelectorAll('.edit-fil-row').forEach(row=>{const fil=D.filamentos.find(f=>f.id===calcFilamentId(row));const epg=fil&&fil.peso>0?fil.precio/fil.peso:0;const cost=epg*(parseFloat(row.querySelector('.ecf-g')?.value||0));const eg=row.querySelector('.ecf-eg');const ce=row.querySelector('.ecf-cost');if(eg)eg.value=fil?fmt4(epg)+' €/g':'—';if(ce)ce.value=fmtCost(cost);});});
+  document.querySelectorAll('#ec-plate-rows .edit-print-plate').forEach(plate=>{updatePlateDurationDisplay(plate);plate.querySelectorAll('.edit-fil-row').forEach(row=>{const fil=D.filamentos.find(f=>f.id===calcFilamentId(row));const epg=fil&&fil.peso>0?fil.precio/fil.peso:0;const cost=epg*(parseFloat(row.querySelector('.ecf-g')?.value||0));const eg=row.querySelector('.ecf-eg');const ce=row.querySelector('.ecf-cost');if(eg)eg.value=fil?fmt4(epg)+' €/g':'—';if(ce)ce.value=fmtCost(cost);});});
 }
 function devolverStockPedidoSilencioso(item){
   (item.usosConsumibles||[]).forEach(u=>{
@@ -1867,6 +1896,7 @@ function devolverStockPedidoSilencioso(item){
 }
 function saveCatalogoEdit(id){
   const item=D.catalogo.find(c=>c.id===id);if(!item)return;
+  if(!validatePlateDurations('#ec-plate-rows'))return;
   const wasDiscounted=!!item.stockDescontado;
   if(wasDiscounted)devolverStockPedidoSilencioso(item);
   const placas=calcEditPlateData();
@@ -1880,8 +1910,7 @@ function saveCatalogoEdit(id){
     const con=D.consumibles.find(c=>c.id===cid);
     if(con&&q>0){usosConsumibles.push({id:con.id,nombre:con.nombre,cantidad:q});tCon+=q*consumibleCosteUnidad(con);}
   }
-  const totalHours=placas.reduce((total,p)=>total+p.horas+p.minutos/60,0);
-  const totalMinutes=Math.max(0,Math.round(totalHours*60));const h=Math.floor(totalMinutes/60);const min=totalMinutes%60;
+  const totalMinutes=placas.reduce((total,p)=>total+p.duracionMinutos,0);const totalHours=totalMinutes/60;
   const w=parseFloat(document.getElementById('ec-watts').value||65);
   const k=parseFloat(document.getElementById('ec-kwh').value||0.18);
   const coste=tFil+totalHours*w/1000*k+tCon;
@@ -1891,11 +1920,12 @@ function saveCatalogoEdit(id){
     contacto:document.getElementById('ec-contacto').value.trim(),
     entrega:dateInputValue('ec-entrega').trim(),
     precioAcordado:parseFloat(document.getElementById('ec-precio').value)||'',
-    horas:h,minutos:min,watts:w,kwh:k,
+    tiempoMinutos:totalMinutes,watts:w,kwh:k,
     notasInternas:document.getElementById('ec-notas-int').value.trim(),
-    materiales:mats.join(' + '),gramos:gramos.toFixed(1),tiempo:`${h}h ${min}min`,placas,
+    materiales:mats.join(' + '),gramos:gramos.toFixed(1),tiempo:formatDurationMinutes(totalMinutes),placas,
     coste,precioCalc:coste*((D.multiplicadores[0]?.mult)||3),usosFilamentos,usosConsumibles
   });
+  delete item.horas;delete item.minutos;
   if(wasDiscounted)descontarStockPedido(item);
   const cobro=D.cobros.find(c=>String(c.itemId)===String(item.id));
   if(cobro){
