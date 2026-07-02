@@ -902,6 +902,7 @@ function save() {
 // ══════════════════════════════════════════════════════
 const fmt=n=>parseFloat(n||0).toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})+' €';
 const fmt4=n=>parseFloat(n||0).toLocaleString('es-ES',{minimumFractionDigits:4,maximumFractionDigits:4});
+const fmtCost=n=>{const v=parseFloat(n||0);const digits=Math.abs(v)>0&&Math.abs(v)<0.1?4:2;return v.toLocaleString('es-ES',{minimumFractionDigits:digits,maximumFractionDigits:digits})+' €';};
 function today(){const d=new Date();return`${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}`;}
 function displayDateToInput(v){
   const p=String(v||'').split('/');
@@ -1336,7 +1337,7 @@ function calcular(){
     const cost=g*epg;tFil+=cost;
     const egEl=row.querySelector('.cf-eg');const ccEl=row.querySelector('.cf-c');
     if(egEl)egEl.value=fil?fmt4(epg)+' €/g':'—';
-    if(ccEl)ccEl.value=fmt(cost);
+    if(ccEl)ccEl.value=fmtCost(cost);
   });
   let tCon=0;
   for(let i=0;i<3;i++){
@@ -1347,14 +1348,14 @@ function calcular(){
     const epu=con?consumibleCosteUnidad(con):0;
     const cost=q*epu;tCon+=cost;
     const ccEl=document.getElementById(`cc-c-${i}`);
-    if(ccEl)ccEl.value=fmt(cost);
+    if(ccEl)ccEl.value=fmtCost(cost);
   }
   const total=tFil+elec+tCon;
   const platesEl=document.getElementById('r-plates');if(platesEl)platesEl.textContent=`${placas.length} ${placas.length===1?'placa':'placas'} · ${formatDuration(th)}`;
-  document.getElementById('r-fil').textContent=fmt(tFil);
-  document.getElementById('r-elec').textContent=fmt(elec);
-  document.getElementById('r-con').textContent=fmt(tCon);
-  document.getElementById('r-total').textContent=fmt(total);
+  document.getElementById('r-fil').textContent=fmtCost(tFil);
+  document.getElementById('r-elec').textContent=fmtCost(elec);
+  document.getElementById('r-con').textContent=fmtCost(tCon);
+  document.getElementById('r-total').textContent=fmtCost(total);
   if(D.multiplicadores.length){
     const m=D.multiplicadores[0];
     const p=total*m.mult;const b=p-total;
@@ -1854,7 +1855,7 @@ function syncEditPlates(){const plates=[...document.querySelectorAll('#ec-plate-
 function syncEditFilamentRows(plate){const rows=[...(plate?.querySelectorAll('.edit-fil-row')||[])];rows.forEach((row,i)=>{row.querySelector('.filament-label').textContent=`Filamento ${i+1}`;row.querySelector('.filament-remove').hidden=rows.length===1;});}
 function calcEditPlateData(){return [...document.querySelectorAll('#ec-plate-rows .edit-print-plate')].map((plate,i)=>({nombre:`Placa ${i+1}`,horas:parseFloat(plate.querySelector('.plate-hours')?.value||0),minutos:parseFloat(plate.querySelector('.plate-minutes')?.value||0),filamentos:[...plate.querySelectorAll('.edit-fil-row')].map(row=>{const id=calcFilamentId(row);const fil=D.filamentos.find(f=>f.id===id);const cantidad=parseFloat(row.querySelector('.ecf-g')?.value||0);return fil&&cantidad>0?{id:fil.id,nombre:fil.nombre,cantidad}:null;}).filter(Boolean)}));}
 function updateEditPlateCosts(){
-  document.querySelectorAll('#ec-plate-rows .edit-print-plate').forEach(plate=>{const h=parseFloat(plate.querySelector('.plate-hours')?.value||0);const m=parseFloat(plate.querySelector('.plate-minutes')?.value||0);const duration=plate.querySelector('.plate-duration');if(duration)duration.value=formatDuration(h+m/60);plate.querySelectorAll('.edit-fil-row').forEach(row=>{const fil=D.filamentos.find(f=>f.id===calcFilamentId(row));const epg=fil&&fil.peso>0?fil.precio/fil.peso:0;const cost=epg*(parseFloat(row.querySelector('.ecf-g')?.value||0));const eg=row.querySelector('.ecf-eg');const ce=row.querySelector('.ecf-cost');if(eg)eg.value=fil?fmt4(epg)+' €/g':'—';if(ce)ce.value=fmt(cost);});});
+  document.querySelectorAll('#ec-plate-rows .edit-print-plate').forEach(plate=>{const h=parseFloat(plate.querySelector('.plate-hours')?.value||0);const m=parseFloat(plate.querySelector('.plate-minutes')?.value||0);const duration=plate.querySelector('.plate-duration');if(duration)duration.value=formatDuration(h+m/60);plate.querySelectorAll('.edit-fil-row').forEach(row=>{const fil=D.filamentos.find(f=>f.id===calcFilamentId(row));const epg=fil&&fil.peso>0?fil.precio/fil.peso:0;const cost=epg*(parseFloat(row.querySelector('.ecf-g')?.value||0));const eg=row.querySelector('.ecf-eg');const ce=row.querySelector('.ecf-cost');if(eg)eg.value=fil?fmt4(epg)+' €/g':'—';if(ce)ce.value=fmtCost(cost);});});
 }
 function devolverStockPedidoSilencioso(item){
   (item.usosConsumibles||[]).forEach(u=>{
