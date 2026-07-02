@@ -138,6 +138,11 @@ tr:hover td{background:var(--bg3);}
 .calc-total{display:flex;justify-content:space-between;align-items:center;padding:12px 0 4px;margin-top:6px;border-top:1px solid var(--border2);}
 .calc-total-label{font-family:var(--display);font-size:14px;font-weight:700;color:var(--text2);}
 .calc-total-val{font-family:var(--display);font-size:26px;font-weight:800;color:var(--accent2);letter-spacing:-1px;}
+.duration-editor{display:grid;grid-template-columns:110px 110px minmax(260px,1fr);gap:10px;align-items:start;margin-bottom:12px;}
+.duration-converter-row{display:flex;gap:8px;}
+.duration-converter-row input{min-width:0;}
+.duration-converter-row .btn{flex:0 0 auto;padding-left:14px;padding-right:14px;}
+.duration-result{min-height:16px;margin-top:5px;font-family:var(--mono);font-size:10px;color:var(--text3);}
 .mult-row{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--border);}
 .mult-row:last-child{border-bottom:none;}
 .mult-x{font-family:var(--mono);color:var(--text3);width:16px;}
@@ -181,6 +186,7 @@ tr:hover td{background:var(--bg3);}
 /* Modal */
 #modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:1000;align-items:center;justify-content:center;}
 #modal-box{background:var(--bg2);border:1px solid var(--border2);border-radius:14px;padding:26px;width:520px;max-width:95vw;max-height:90vh;overflow-y:auto;}
+#modal-box.modal-wide{width:min(980px,calc(100vw - 48px));max-width:none;}
 
 /* Notif */
 .notif{position:fixed;bottom:24px;right:24px;background:var(--bg2);border:1px solid var(--border2);border-radius:10px;padding:12px 18px;font-size:13px;color:var(--text);z-index:9999;transform:translateY(80px);opacity:0;transition:all 0.3s;max-width:320px;}
@@ -234,6 +240,8 @@ tr:hover td{background:var(--bg3);}
   .filament-search-results{max-height:38dvh;}
   .print-plate{padding:12px;}
   .print-plate-header{align-items:flex-start;}
+  .duration-editor{grid-template-columns:1fr 1fr;}
+  .duration-converter{grid-column:1/-1;}
   .form-row{gap:8px;margin-bottom:8px;}
   input[type=text],input[type=number],input[type=email],input[type=date],select,textarea{font-size:16px;padding:10px 12px;min-height:44px;max-width:100%;}
   .btn{min-height:44px;padding:10px 14px;touch-action:manipulation;-webkit-tap-highlight-color:transparent;}
@@ -257,6 +265,7 @@ tr:hover td{background:var(--bg3);}
   .mult-price{min-width:auto;text-align:left;}
   #modal-overlay{align-items:flex-end;padding-top:max(12px,env(safe-area-inset-top));}
   #modal-box{width:100%;max-width:100%;max-height:calc(92dvh - env(safe-area-inset-top));padding:18px max(18px,env(safe-area-inset-right)) calc(18px + env(safe-area-inset-bottom)) max(18px,env(safe-area-inset-left));border-radius:14px 14px 0 0;overscroll-behavior:contain;}
+  #modal-box.modal-wide{width:100%;max-width:100%;}
   .notif{left:max(12px,env(safe-area-inset-left));right:max(12px,env(safe-area-inset-right));bottom:calc(82px + env(safe-area-inset-bottom));max-width:none;}
   .save-status{top:calc(10px + env(safe-area-inset-top));right:max(10px,env(safe-area-inset-right));}
 }
@@ -1206,9 +1215,10 @@ function renderFilRows(){
 function addPrintPlate(values={}){
   const el=document.getElementById('plate-rows');if(!el)return;
   const durationMinutes=values.duracionMinutos??Math.round((parseFloat(values.horas)||0)*60+(parseFloat(values.minutos)||0));
+  const durationParts=durationMinutesToParts(durationMinutes);
   const plate=document.createElement('div');plate.className='print-plate';
   plate.innerHTML=`<div class="print-plate-header"><div class="print-plate-title">Placa</div><div class="print-plate-actions"><button type="button" class="action-btn plate-remove" title="Quitar placa" onclick="removePrintPlate(this)">×</button></div></div>
-    <div class="form-row cols2"><div><label>Duración de impresión</label><input class="plate-duration-input duration-input" type="text" value="${formatDurationMinutes(durationMinutes)}" placeholder="Ej: 9h03m, 27min o 9.1h" oninput="calcular()"></div><div><label>Interpretado como</label><input class="plate-duration duration-output" type="text" readonly style="color:var(--text3)"></div></div>
+    <div class="duration-editor"><div><label>Horas</label><input class="plate-hours" type="number" value="${durationParts.hours}" min="0" step="1" inputmode="numeric" oninput="calcular()"></div><div><label>Minutos</label><input class="plate-minutes" type="number" value="${durationParts.minutes}" min="0" max="59" step="1" inputmode="numeric" oninput="calcular()"></div><div class="duration-converter"><label>Conversor de duración (opcional)</label><div class="duration-converter-row"><input class="plate-duration-input" type="text" placeholder="Ej: 9.1h, 1h28m o 27min" onkeydown="handleDurationConverterKey(event,this)"><button type="button" class="btn btn-ghost" onclick="applyDurationConverter(this.closest('.print-plate'))">Aplicar</button></div><div class="duration-result">Duración: ${formatDurationMinutes(durationMinutes)}</div></div></div>
     <div class="plate-filaments"><div class="plate-filament-rows"></div><button type="button" class="btn btn-ghost plate-add-filament" onclick="addFilamentRow(this.closest('.print-plate'))">+ Añadir filamento</button></div>`;
   el.appendChild(plate);
   const filamentos=values.filamentos?.length?values.filamentos:[{}];
@@ -1305,15 +1315,25 @@ function formatDurationMinutes(totalMinutes){
   const total=Math.max(0,Math.round(parseFloat(totalMinutes)||0));const hours=Math.floor(total/60);const minutes=total%60;
   return hours?`${hours}h ${String(minutes).padStart(2,'0')}min`:`${minutes}min`;
 }
+function durationMinutesToParts(totalMinutes){const total=Math.max(0,Math.round(parseFloat(totalMinutes)||0));return{hours:Math.floor(total/60),minutes:total%60};}
 function updatePlateDurationDisplay(plate){
-  const input=plate?.querySelector('.plate-duration-input');const output=plate?.querySelector('.plate-duration');if(!input)return 0;
-  const minutes=parseDurationToMinutes(input.value);const invalid=minutes===null;
-  input.classList.toggle('invalid',invalid);if(output){output.classList.toggle('invalid',invalid);output.value=invalid?'Formato no válido':formatDurationMinutes(minutes);}
-  return invalid?0:minutes;
+  const hoursInput=plate?.querySelector('.plate-hours');const minutesInput=plate?.querySelector('.plate-minutes');if(!hoursInput||!minutesInput)return 0;
+  const hours=Number(hoursInput.value);const minutes=Number(minutesInput.value);const invalid=!Number.isInteger(hours)||hours<0||!Number.isInteger(minutes)||minutes<0||minutes>59;
+  hoursInput.classList.toggle('invalid',invalid);minutesInput.classList.toggle('invalid',invalid);
+  const total=invalid?0:hours*60+minutes;const result=plate.querySelector('.duration-result');if(result)result.textContent=invalid?'Revisa las horas y los minutos':`Duración: ${formatDurationMinutes(total)}`;
+  return total;
 }
+function applyDurationConverter(plate){
+  const input=plate?.querySelector('.plate-duration-input');if(!input)return;
+  const total=parseDurationToMinutes(input.value);const invalid=total===null;
+  input.classList.toggle('invalid',invalid);if(invalid){notify('No reconozco esa duración','error');input.focus();return;}
+  const parts=durationMinutesToParts(total);plate.querySelector('.plate-hours').value=parts.hours;plate.querySelector('.plate-minutes').value=parts.minutes;updatePlateDurationDisplay(plate);input.value='';
+  plate.classList.contains('edit-print-plate')?updateEditPlateCosts():calcular();
+}
+function handleDurationConverterKey(event,input){if(event.key==='Enter'){event.preventDefault();applyDurationConverter(input.closest('.print-plate'));}}
 function validatePlateDurations(containerSelector){
-  const inputs=[...document.querySelectorAll(`${containerSelector} .plate-duration-input`)];const invalid=inputs.find(input=>parseDurationToMinutes(input.value)===null);
-  if(invalid){invalid.classList.add('invalid');invalid.focus();notify('Revisa el formato de duración','error');return false;}return true;
+  const plates=[...document.querySelectorAll(`${containerSelector} .print-plate`)];const invalid=plates.find(plate=>{updatePlateDurationDisplay(plate);return plate.querySelector('.plate-hours.invalid,.plate-minutes.invalid');});
+  if(invalid){invalid.querySelector('.invalid')?.focus();notify('Revisa las horas y los minutos','error');return false;}return true;
 }
 function renderConRows(){
   const el=document.getElementById('con-rows');el.innerHTML='';
@@ -1840,7 +1860,7 @@ function editCatalogoItem(id){
     <div class="card" style="padding:14px;margin-bottom:12px"><div class="card-title">Placas de impresión</div><div id="ec-plate-rows">${plateRows}</div><button type="button" class="btn btn-ghost" onclick="addEditPlate()">+ Añadir placa</button></div>
     <div class="card" style="padding:14px;margin-bottom:12px"><div class="card-title">Consumibles</div>${conRows}</div>
     <div class="form-row"><div><label>Notas internas</label><input type="text" id="ec-notas-int" value="${item.notasInternas||item.notas||''}"></div></div>
-    <div style="display:flex;gap:8px;margin-top:10px"><button class="btn btn-primary" style="flex:1" onclick="saveCatalogoEdit(${id})">Guardar cambios</button><button class="btn btn-ghost" onclick="closeModal()">Cancelar</button></div>`);
+    <div style="display:flex;gap:8px;margin-top:10px"><button class="btn btn-primary" style="flex:1" onclick="saveCatalogoEdit(${id})">Guardar cambios</button><button class="btn btn-ghost" onclick="closeModal()">Cancelar</button></div>`,true);
   (item.usosConsumibles||[]).forEach((u,i)=>{const sel=document.getElementById(`ecc-sel-${i}`);const c=D.consumibles.find(x=>x.id===u.id)||D.consumibles.find(x=>x.nombre===u.nombre);if(sel&&c)sel.value=c.id;});
   syncEditPlates();updateEditPlateCosts();
 }
@@ -1859,8 +1879,9 @@ function pedidoPlacas(item){
 function editPlateHtml(i,plate={}){
   const filamentos=plate.filamentos?.length?plate.filamentos:[{}];
   const durationMinutes=plate.duracionMinutos??Math.round((parseFloat(plate.horas)||0)*60+(parseFloat(plate.minutos)||0));
+  const durationParts=durationMinutesToParts(durationMinutes);
   return `<div class="print-plate edit-print-plate"><div class="print-plate-header"><div class="print-plate-title">Placa ${i+1}</div><div class="print-plate-actions"><button type="button" class="action-btn plate-remove" title="Quitar placa" onclick="removeEditPlate(this)">×</button></div></div>
-    <div class="form-row cols2"><div><label>Duración de impresión</label><input class="plate-duration-input duration-input" type="text" value="${formatDurationMinutes(durationMinutes)}" placeholder="Ej: 9h03m, 27min o 9.1h" oninput="updateEditPlateCosts()"></div><div><label>Interpretado como</label><input class="plate-duration duration-output" type="text" readonly style="color:var(--text3)"></div></div>
+    <div class="duration-editor"><div><label>Horas</label><input class="plate-hours" type="number" value="${durationParts.hours}" min="0" step="1" inputmode="numeric" oninput="updateEditPlateCosts()"></div><div><label>Minutos</label><input class="plate-minutes" type="number" value="${durationParts.minutes}" min="0" max="59" step="1" inputmode="numeric" oninput="updateEditPlateCosts()"></div><div class="duration-converter"><label>Conversor de duración (opcional)</label><div class="duration-converter-row"><input class="plate-duration-input" type="text" placeholder="Ej: 9.1h, 1h28m o 27min" onkeydown="handleDurationConverterKey(event,this)"><button type="button" class="btn btn-ghost" onclick="applyDurationConverter(this.closest('.print-plate'))">Aplicar</button></div><div class="duration-result">Duración: ${formatDurationMinutes(durationMinutes)}</div></div></div>
     <div class="plate-filaments"><div class="edit-plate-filament-rows">${filamentos.map((u,j)=>editFilamentRowHtml(j,u)).join('')}</div><button type="button" class="btn btn-ghost plate-add-filament" onclick="addEditFilamentRow(this.closest('.edit-print-plate'))">+ Añadir filamento</button></div></div>`;
 }
 function editFilamentRowHtml(i,u={}){
@@ -2439,7 +2460,7 @@ function saveSettings(){
 // ══════════════════════════════════════════════════════
 // MODAL
 // ══════════════════════════════════════════════════════
-function openModal(html){document.getElementById('modal-box').innerHTML=html;document.getElementById('modal-overlay').style.display='flex';}
+function openModal(html,wide=false){const box=document.getElementById('modal-box');box.classList.toggle('modal-wide',wide);box.innerHTML=html;document.getElementById('modal-overlay').style.display='flex';}
 function closeModal(){document.getElementById('modal-overlay').style.display='none';}
 
 // ══════════════════════════════════════════════════════
