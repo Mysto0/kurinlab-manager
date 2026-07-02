@@ -172,6 +172,11 @@ tr:hover td{background:var(--bg3);}
 .orders-compact-item{border:1px solid var(--border);border-radius:8px;padding:10px 12px;background:var(--bg3);}
 .orders-compact-title{font-size:13px;font-weight:600;color:var(--text);margin-bottom:3px;}
 .orders-compact-meta{font-size:11px;color:var(--text3);font-family:var(--mono);}
+.catalog-status-group{margin-bottom:20px;}
+.catalog-status-header{display:flex;align-items:center;gap:9px;margin:0 2px 8px;}
+.catalog-status-title{font-family:var(--display);font-size:14px;font-weight:800;color:var(--text);}
+.catalog-status-count{min-width:22px;height:22px;padding:0 7px;border-radius:11px;display:inline-flex;align-items:center;justify-content:center;background:var(--bg4);color:var(--text3);font-family:var(--mono);font-size:10px;}
+.catalog-status-dot{width:8px;height:8px;border-radius:50%;background:var(--accent2);}
 
 /* Dashboard */
 .alert-item{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border);}
@@ -496,14 +501,7 @@ tr:hover td{background:var(--bg3);}
       <option>Listo</option><option>Entregado</option><option>Cobrado</option><option>Cancelado</option>
     </select>
   </div>
-  <div class="card">
-    <div class="table-wrap">
-      <table>
-        <thead><tr><th>Producto</th><th>Cliente</th><th>Materiales</th><th>Coste</th><th>Precio calc.</th><th>Precio acordado</th><th>Estado</th><th>Entrega</th><th>Notas internas</th><th></th></tr></thead>
-        <tbody id="cat-table"></tbody>
-      </table>
-    </div>
-  </div>
+  <div id="cat-groups"></div>
 </div>
 
 <!-- ══ PEDIDOS KANBAN ══ -->
@@ -1809,25 +1807,7 @@ const ESTADOS=['Presupuesto','Aceptado','Diseño','Preparando','Imprimiendo','Po
 function pedidoIngreso(item){return parseFloat(item.precioAcordado)||parseFloat(item.precioCalc)||0;}
 function pedidoCoste(item){return parseFloat(item.coste)||0;}
 function pedidoBeneficio(item){return pedidoIngreso(item)-pedidoCoste(item);}
-function renderCatalogo(){
-  const rawFiltro=document.getElementById('filtro-estado').value;
-  const filtro=['activos','vendidos','cancelados'].includes(rawFiltro)?rawFiltro:normalizeEstado(rawFiltro);
-  const search=(document.getElementById('cat-search')?.value||'').toLowerCase().trim();
-  const items=D.catalogo.filter(c=>{
-    const e=normalizeEstado(c.estado);
-    if(!rawFiltro)return true;
-    if(filtro==='activos')return !['Cobrado','Cancelado'].includes(e);
-    if(filtro==='vendidos')return e==='Cobrado';
-    if(filtro==='cancelados')return e==='Cancelado';
-    if(e!==filtro)return false;
-    return true;
-  }).filter(c=>{
-    if(!search)return true;
-    return `${c.nombre||''} ${c.cliente||''} ${c.contacto||''} ${c.materiales||''}`.toLowerCase().includes(search);
-  });
-  const tbody=document.getElementById('cat-table');
-  if(!items.length){tbody.innerHTML='<tr><td colspan="10"><div class="empty"><p>No hay productos. Usa la Calculadora para añadir.</p></div></td></tr>';return;}
-  tbody.innerHTML=items.slice().reverse().map(c=>`<tr>
+function catalogoRow(c){return `<tr>
     <td class="td-main">${c.nombre}</td>
     <td><div class="td-main">${c.cliente||'—'}</div><div class="order-meta">${c.contacto||''}</div></td>
     <td style="font-size:11px;color:var(--text3);max-width:120px">${c.materiales||'—'}</td>
@@ -1844,7 +1824,39 @@ function renderCatalogo(){
       <button class="btn btn-ghost" style="padding:5px 9px;font-size:11px;margin-left:4px" onclick="duplicarPedido(${c.id})">Duplicar</button>
       <button class="action-btn" onclick="delCatalogo(${c.id})" style="margin-left:4px">✕</button>
     </td>
-  </tr>`).join('');
+  </tr>`;}
+function renderCatalogo(){
+  const rawFiltro=document.getElementById('filtro-estado').value;
+  const filtro=['activos','vendidos','cancelados'].includes(rawFiltro)?rawFiltro:normalizeEstado(rawFiltro);
+  const search=(document.getElementById('cat-search')?.value||'').toLowerCase().trim();
+  const items=D.catalogo.filter(c=>{
+    const e=normalizeEstado(c.estado);
+    if(!rawFiltro)return true;
+    if(filtro==='activos')return !['Cobrado','Cancelado'].includes(e);
+    if(filtro==='vendidos')return e==='Cobrado';
+    if(filtro==='cancelados')return e==='Cancelado';
+    if(e!==filtro)return false;
+    return true;
+  }).filter(c=>{
+    if(!search)return true;
+    return `${c.nombre||''} ${c.cliente||''} ${c.contacto||''} ${c.materiales||''}`.toLowerCase().includes(search);
+  });
+  const container=document.getElementById('cat-groups');
+  if(!items.length){container.innerHTML='<div class="card"><div class="empty"><p>No hay productos para mostrar. Usa la Calculadora para añadir.</p></div></div>';return;}
+  const labels={Post:'Post-procesado'};
+  const colors={Presupuesto:'#3b82f6',Aceptado:'#8b5cf6','Diseño':'#f59e0b',Preparando:'#94a3b8',Imprimiendo:'#f97316',Post:'#22c55e',Listo:'#10b981',Entregado:'#14b8a6',Cobrado:'#22c55e',Cancelado:'#ef4444'};
+  const known=ESTADOS.filter(estado=>items.some(item=>normalizeEstado(item.estado)===estado));
+  const extra=[...new Set(items.map(item=>normalizeEstado(item.estado)))].filter(estado=>!ESTADOS.includes(estado));
+  container.innerHTML=[...known,...extra].map(estado=>{
+    const groupItems=items.filter(item=>normalizeEstado(item.estado)===estado).slice().reverse();
+    return `<section class="catalog-status-group">
+      <div class="catalog-status-header"><span class="catalog-status-dot" style="background:${colors[estado]||'var(--accent2)'}"></span><span class="catalog-status-title">${labels[estado]||estado}</span><span class="catalog-status-count">${groupItems.length}</span></div>
+      <div class="card" style="padding:0;overflow:hidden"><div class="table-wrap"><table>
+        <thead><tr><th>Producto</th><th>Cliente</th><th>Materiales</th><th>Coste</th><th>Precio calc.</th><th>Precio acordado</th><th>Estado</th><th>Entrega</th><th>Notas internas</th><th></th></tr></thead>
+        <tbody>${groupItems.map(catalogoRow).join('')}</tbody>
+      </table></div></div>
+    </section>`;
+  }).join('');
 }
 function parseTiempoPedido(item){
   if(item.tiempoMinutos!==undefined)return Math.max(0,Math.round(parseFloat(item.tiempoMinutos)||0));
