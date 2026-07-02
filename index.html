@@ -378,11 +378,15 @@ tr:hover td{background:var(--bg3);}
         <button type="button" class="btn btn-ghost" onclick="addPrintPlate()">+ Añadir placa</button>
       </div>
       <div class="card">
-        <div class="card-title">Electricidad</div>
+        <div class="card-title">Tiempo y producción</div>
         <div class="form-row cols3">
           <div><label>Tiempo total</label><input type="text" id="c-total-h" readonly style="color:var(--text3)"></div>
           <div><label>Consumo (W)</label><input type="number" id="c-watts" value="65" oninput="calcular()"></div>
-          <div><label>Precio kWh (€)</label><input type="number" id="c-kwh" value="0.18" step="0.001" oninput="calcular()"></div>
+          <div><label>Precio kWh (€)</label><input type="text" inputmode="decimal" id="c-kwh" value="0,18" oninput="calcular()" onblur="this.value=formatDecimalInput(parseDecimalInput(this.value,0.18),2)"></div>
+        </div>
+        <div class="form-row cols2">
+          <div><label>Coste de máquina (€/hora)</label><input type="text" inputmode="decimal" id="c-machine-rate" value="1,00" oninput="calcular()" onblur="this.value=formatDecimalInput(Math.max(0,parseDecimalInput(this.value)),2)"></div>
+          <div><label>Coste de trabajo manual (€)</label><input type="number" id="c-manual-cost" value="0" min="0" step="0.5" oninput="calcular()"></div>
         </div>
       </div>
       <div class="card">
@@ -397,6 +401,8 @@ tr:hover td{background:var(--bg3);}
           <div class="calc-line"><span class="calc-line-label">Placas / tiempo</span><span class="calc-line-val" id="r-plates">1 · 0h 0min</span></div>
           <div class="calc-line"><span class="calc-line-label">Filamentos</span><span class="calc-line-val" id="r-fil">0,00 €</span></div>
           <div class="calc-line"><span class="calc-line-label">Electricidad</span><span class="calc-line-val" id="r-elec">0,00 €</span></div>
+          <div class="calc-line"><span class="calc-line-label">Uso de la máquina</span><span class="calc-line-val" id="r-machine">0,00 €</span></div>
+          <div class="calc-line"><span class="calc-line-label">Trabajo manual</span><span class="calc-line-val" id="r-manual">0,00 €</span></div>
           <div class="calc-line"><span class="calc-line-label">Consumibles</span><span class="calc-line-val" id="r-con">0,00 €</span></div>
           <div class="calc-total"><span class="calc-total-label">Coste total</span><span class="calc-total-val" id="r-total">0,00 €</span></div>
         </div>
@@ -657,9 +663,10 @@ tr:hover td{background:var(--bg3);}
     </div>
     <div class="settings-section">
       <h3>Calculadora — valores por defecto</h3>
-      <div class="form-row cols2">
+      <div class="form-row cols3">
         <div><label>Consumo impresora (W)</label><input type="number" id="s-watts" value="65"></div>
-        <div><label>Precio kWh (€)</label><input type="number" id="s-kwh" value="0.18" step="0.001"></div>
+        <div><label>Precio kWh (€)</label><input type="text" inputmode="decimal" id="s-kwh" value="0,18" onblur="this.value=formatDecimalInput(parseDecimalInput(this.value,0.18),2)"></div>
+        <div><label>Coste de máquina (€/hora)</label><input type="text" inputmode="decimal" id="s-machine-rate" value="1,00" onblur="this.value=formatDecimalInput(Math.max(0,parseDecimalInput(this.value)),2)"></div>
       </div>
     </div>
     <button class="btn btn-primary" onclick="saveSettings()">Guardar ajustes</button>
@@ -855,7 +862,7 @@ const DEF = {
   ],
   catalogo:[],gastos:[],cobros:[],actividad:[],stockMovs:[],materiales:[],
   multiplicadores:[{mult:2,label:"x2 — Básico"},{mult:3,label:"x3 — Recomendado"},{mult:4,label:"x4 — Feria"}],
-  settings:{nombre:"Kurin Lab",sub:"CREATE · TEST · EVOLVE",watts:65,kwh:0.18,logo:""},
+  settings:{nombre:"Kurin Lab",sub:"CREATE · TEST · EVOLVE",watts:65,kwh:0.18,machineRate:1,logo:""},
   nextId:{fil:6,con:3,cat:1,gasto:1,mat:1}
 };
 
@@ -865,6 +872,7 @@ if(!D.stockMovs) D.stockMovs=[];
 if(!D.materiales) D.materiales=[];
 if(!D.settings) D.settings=JSON.parse(JSON.stringify(DEF.settings));
 if(!D.settings.logo) D.settings.logo="";
+if(D.settings.machineRate===undefined) D.settings.machineRate=1;
 D.catalogo.forEach(c=>{c.estado=normalizeEstado(c.estado);});
 D.filamentos.forEach(f=>{if(f.archivado===undefined)f.archivado=false;});
 D.consumibles.forEach(c=>{if(c.stock===undefined)c.stock=c.uds;if(c.archivado===undefined)c.archivado=false;if(c.costeUnidad===undefined)c.costeUnidad=(parseFloat(c.precio)||0)/(parseFloat(c.uds)||1);});
@@ -914,6 +922,8 @@ function save() {
 const fmt=n=>parseFloat(n||0).toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})+' €';
 const fmt4=n=>parseFloat(n||0).toLocaleString('es-ES',{minimumFractionDigits:4,maximumFractionDigits:4});
 const fmtCost=n=>{const v=parseFloat(n||0);const digits=Math.abs(v)>0&&Math.abs(v)<0.1?4:2;return v.toLocaleString('es-ES',{minimumFractionDigits:digits,maximumFractionDigits:digits})+' €';};
+function parseDecimalInput(value,fallback=0){const parsed=parseFloat(String(value??'').trim().replace(',','.'));return Number.isFinite(parsed)?parsed:fallback;}
+function formatDecimalInput(value,digits=2){return parseDecimalInput(value).toLocaleString('es-ES',{minimumFractionDigits:digits,maximumFractionDigits:digits,useGrouping:false});}
 function today(){const d=new Date();return`${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}`;}
 function displayDateToInput(v){
   const p=String(v||'').split('/');
@@ -1205,7 +1215,9 @@ function renderDashboard(){
 function initCalc(){
   const s=D.settings;
   document.getElementById('c-watts').value=s.watts||65;
-  document.getElementById('c-kwh').value=s.kwh||0.18;
+  document.getElementById('c-kwh').value=formatDecimalInput(s.kwh??0.18,2);
+  document.getElementById('c-machine-rate').value=formatDecimalInput(s.machineRate??1,2);
+  document.getElementById('c-manual-cost').value=0;
   renderFilRows();renderConRows();renderMultRows();calcular();
 }
 function renderFilRows(){
@@ -1368,8 +1380,11 @@ function calcular(){
   const totalMinutes=placas.reduce((total,p)=>total+p.duracionMinutos,0);const th=totalMinutes/60;
   const thEl=document.getElementById('c-total-h');if(thEl)thEl.value=formatDurationMinutes(totalMinutes);
   const w=parseFloat(document.getElementById('c-watts')?.value||65);
-  const k=parseFloat(document.getElementById('c-kwh')?.value||0.18);
+  const k=parseDecimalInput(document.getElementById('c-kwh')?.value,0.18);
   const elec=th*w/1000*k;
+  const machineRate=Math.max(0,parseDecimalInput(document.getElementById('c-machine-rate')?.value));
+  const machineCost=th*machineRate;
+  const manualCost=Math.max(0,parseFloat(document.getElementById('c-manual-cost')?.value)||0);
   let tFil=0;
   document.querySelectorAll('#plate-rows .calc-fil-row').forEach(row=>{
     const gEl=row.querySelector('.cf-g');
@@ -1392,10 +1407,12 @@ function calcular(){
     const ccEl=document.getElementById(`cc-c-${i}`);
     if(ccEl)ccEl.value=fmtCost(cost);
   }
-  const total=tFil+elec+tCon;
+  const total=tFil+elec+tCon+machineCost+manualCost;
   const platesEl=document.getElementById('r-plates');if(platesEl)platesEl.textContent=`${placas.length} ${placas.length===1?'placa':'placas'} · ${formatDurationMinutes(totalMinutes)}`;
   document.getElementById('r-fil').textContent=fmtCost(tFil);
   document.getElementById('r-elec').textContent=fmtCost(elec);
+  document.getElementById('r-machine').textContent=fmtCost(machineCost);
+  document.getElementById('r-manual').textContent=fmtCost(manualCost);
   document.getElementById('r-con').textContent=fmtCost(tCon);
   document.getElementById('r-total').textContent=fmtCost(total);
   if(D.multiplicadores.length){
@@ -1409,6 +1426,8 @@ function calcular(){
 function limpiarCalculadora(){
   ['c-nombre','c-cliente','c-contacto','c-entrega','c-notas-internas'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
   const anticipo=document.getElementById('c-anticipo');if(anticipo)anticipo.value='0';
+  const manualCost=document.getElementById('c-manual-cost');if(manualCost)manualCost.value='0';
+  const machineRate=document.getElementById('c-machine-rate');if(machineRate)machineRate.value=formatDecimalInput(D.settings.machineRate??1,2);
   renderFilRows();
   for(let i=0;i<3;i++){
     const sel=document.getElementById(`cc-sel-${i}`);const q=document.getElementById(`cc-q-${i}`);
@@ -1474,14 +1493,16 @@ function guardarEnCatalogo(){
   }
   const totalMinutes=placas.reduce((total,p)=>total+p.duracionMinutos,0);const th=totalMinutes/60;
   const w=parseFloat(document.getElementById('c-watts').value||65);
-  const k=parseFloat(document.getElementById('c-kwh').value||0.18);
+  const k=parseDecimalInput(document.getElementById('c-kwh').value,0.18);
+  const machineRate=Math.max(0,parseDecimalInput(document.getElementById('c-machine-rate').value));
+  const manualCost=Math.max(0,parseFloat(document.getElementById('c-manual-cost').value)||0);
   let tFil=0,tCon=0;
   usosFilamentos.forEach(u=>{const fil=D.filamentos.find(f=>String(f.id)===String(u.id))||D.filamentos.find(f=>f.nombre===u.nombre);if(fil&&fil.peso>0)tFil+=u.cantidad*(fil.precio/fil.peso);});
   for(let i=0;i<3;i++){const sel=document.getElementById(`cc-sel-${i}`);const qEl=document.getElementById(`cc-q-${i}`);const cid=parseInt(sel?.value||0);const q=parseFloat(qEl?.value||0);const con=D.consumibles.find(c=>c.id===cid);if(con&&q>0)tCon+=q*consumibleCosteUnidad(con);}
-  const total=tFil+th*w/1000*k+tCon;
+  const total=tFil+th*w/1000*k+tCon+th*machineRate+manualCost;
   const mRef=D.multiplicadores[0];
   const precioCalc=total*(mRef?.mult||3);
-  const item={id:D.nextId.cat++,nombre,cliente,contacto,entrega,anticipo,notasInternas,materiales:mats.join(' + '),gramos:gramos.toFixed(1),tiempo:formatDurationMinutes(totalMinutes),tiempoMinutos:totalMinutes,watts:w,kwh:k,placas,coste:total,precioCalc,precioAcordado:'',estado:'Presupuesto',fecha:today(),fechaCobro:'',notas:'',usosFilamentos,usosConsumibles,stockDescontado:false};
+  const item={id:D.nextId.cat++,nombre,cliente,contacto,entrega,anticipo,notasInternas,materiales:mats.join(' + '),gramos:gramos.toFixed(1),tiempo:formatDurationMinutes(totalMinutes),tiempoMinutos:totalMinutes,watts:w,kwh:k,machineRate,manualCost,placas,coste:total,precioCalc,precioAcordado:'',estado:'Presupuesto',fecha:today(),fechaCobro:'',notas:'',usosFilamentos,usosConsumibles,stockDescontado:false};
   D.catalogo.push(item);
   saveToSupabase('catalogo',item);
   addActividad(`Presupuesto guardado: ${nombre}`,{tipo:'guardar',refType:'catalogo',refId:item.id});
@@ -1855,7 +1876,11 @@ function editCatalogoItem(id){
     <div class="form-row cols3">
       <div><label>Precio acordado (€)</label><input type="number" id="ec-precio" value="${item.precioAcordado||''}" step="0.01"></div>
       <div><label>Consumo (W)</label><input type="number" id="ec-watts" value="${item.watts||D.settings.watts||65}"></div>
-      <div><label>Precio kWh (€)</label><input type="number" id="ec-kwh" value="${item.kwh||D.settings.kwh||0.18}" step="0.001"></div>
+      <div><label>Precio kWh (€)</label><input type="text" inputmode="decimal" id="ec-kwh" value="${formatDecimalInput(item.kwh??D.settings.kwh??0.18,2)}" onblur="this.value=formatDecimalInput(parseDecimalInput(this.value,0.18),2)"></div>
+    </div>
+    <div class="form-row cols2">
+      <div><label>Coste de máquina (€/hora)</label><input type="text" inputmode="decimal" id="ec-machine-rate" value="${formatDecimalInput(item.machineRate??D.settings.machineRate??1,2)}" onblur="this.value=formatDecimalInput(Math.max(0,parseDecimalInput(this.value)),2)"></div>
+      <div><label>Coste de trabajo manual (€)</label><input type="number" id="ec-manual-cost" value="${item.manualCost??0}" min="0" step="0.5"></div>
     </div>
     <div class="card" style="padding:14px;margin-bottom:12px"><div class="card-title">Placas de impresión</div><div id="ec-plate-rows">${plateRows}</div><button type="button" class="btn btn-ghost" onclick="addEditPlate()">+ Añadir placa</button></div>
     <div class="card" style="padding:14px;margin-bottom:12px"><div class="card-title">Consumibles</div>${conRows}</div>
@@ -1933,15 +1958,17 @@ function saveCatalogoEdit(id){
   }
   const totalMinutes=placas.reduce((total,p)=>total+p.duracionMinutos,0);const totalHours=totalMinutes/60;
   const w=parseFloat(document.getElementById('ec-watts').value||65);
-  const k=parseFloat(document.getElementById('ec-kwh').value||0.18);
-  const coste=tFil+totalHours*w/1000*k+tCon;
+  const k=parseDecimalInput(document.getElementById('ec-kwh').value,0.18);
+  const machineRate=Math.max(0,parseDecimalInput(document.getElementById('ec-machine-rate').value));
+  const manualCost=Math.max(0,parseFloat(document.getElementById('ec-manual-cost').value)||0);
+  const coste=tFil+totalHours*w/1000*k+tCon+totalHours*machineRate+manualCost;
   Object.assign(item,{
     nombre:document.getElementById('ec-nombre').value.trim()||item.nombre,
     cliente:document.getElementById('ec-cliente').value.trim(),
     contacto:document.getElementById('ec-contacto').value.trim(),
     entrega:dateInputValue('ec-entrega').trim(),
     precioAcordado:parseFloat(document.getElementById('ec-precio').value)||'',
-    tiempoMinutos:totalMinutes,watts:w,kwh:k,
+    tiempoMinutos:totalMinutes,watts:w,kwh:k,machineRate,manualCost,
     notasInternas:document.getElementById('ec-notas-int').value.trim(),
     materiales:mats.join(' + '),gramos:gramos.toFixed(1),tiempo:formatDurationMinutes(totalMinutes),placas,
     coste,precioCalc:coste*((D.multiplicadores[0]?.mult)||3),usosFilamentos,usosConsumibles
@@ -2051,6 +2078,8 @@ function openDocModal(id){
 function generarPDF(id,tipo='Presupuesto'){
   const item=D.catalogo.find(c=>c.id===id);if(!item)return;
   const precio=parseFloat(item.precioAcordado)||parseFloat(item.precioCalc)||0;
+  const machineCost=(parseTiempoPedido(item)/60)*(parseFloat(item.machineRate)||0);
+  const manualCost=parseFloat(item.manualCost)||0;
   const logo=D.settings.logo||KURIN_LOGO||'';
   const nombreNegocio=D.settings.nombre||'Kurin Lab';
   const prefix=tipo==='Recibo'?'R':tipo==='Pedido'?'O':'P';
@@ -2112,6 +2141,8 @@ body{font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;background:#fff;col
   <div class="section">
     <div class="section-title">Desglose</div>
     <div class="detail-row"><span class="detail-label">Coste de producción</span><span class="detail-value">${fmt(item.coste)}</span></div>
+    ${machineCost?`<div class="detail-row"><span class="detail-label">Uso de la máquina</span><span class="detail-value">${fmt(machineCost)}</span></div>`:''}
+    ${manualCost?`<div class="detail-row"><span class="detail-label">Trabajo manual</span><span class="detail-value">${fmt(manualCost)}</span></div>`:''}
     <div class="detail-row"><span class="detail-label">Precio de venta calculado</span><span class="detail-value">${fmt(item.precioCalc)}</span></div>
     ${parseFloat(item.anticipo)?`<div class="detail-row"><span class="detail-label">Anticipo</span><span class="detail-value">${fmt(item.anticipo)}</span></div>`:''}
     <div class="detail-row" style="border-bottom:2px solid #1a1a1a;font-weight:700"><span>Precio acordado</span><span class="detail-value" style="font-size:16px">${fmt(precio)}</span></div>
@@ -2426,7 +2457,8 @@ function loadSettings(){
   const sn=document.getElementById('s-nombre');if(sn)sn.value=s.nombre||'';
   const ss=document.getElementById('s-sub');if(ss)ss.value=s.sub||'';
   const sw=document.getElementById('s-watts');if(sw)sw.value=s.watts||65;
-  const sk=document.getElementById('s-kwh');if(sk)sk.value=s.kwh||0.18;
+  const sk=document.getElementById('s-kwh');if(sk)sk.value=formatDecimalInput(s.kwh??0.18,2);
+  const sm=document.getElementById('s-machine-rate');if(sm)sm.value=formatDecimalInput(s.machineRate??1,2);
   const logoSrc = s.logo || KURIN_LOGO;
   if(logoSrc){
     const pb=document.getElementById('logo-preview-box');
@@ -2450,7 +2482,8 @@ function saveSettings(){
   D.settings.nombre=document.getElementById('s-nombre').value.trim()||'Kurin Lab';
   D.settings.sub=document.getElementById('s-sub').value.trim();
   D.settings.watts=parseFloat(document.getElementById('s-watts').value)||65;
-  D.settings.kwh=parseFloat(document.getElementById('s-kwh').value)||0.18;
+  D.settings.kwh=parseDecimalInput(document.getElementById('s-kwh').value,0.18);
+  D.settings.machineRate=Math.max(0,parseDecimalInput(document.getElementById('s-machine-rate').value));
   // Actualizar sidebar
   document.getElementById('app-title').innerHTML=D.settings.nombre.replace('3D','<span>3D</span>');
   if(D.settings.sub)document.getElementById('app-sub').textContent=D.settings.sub;
